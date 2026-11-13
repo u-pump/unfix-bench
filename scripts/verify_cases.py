@@ -380,6 +380,11 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
     verdict_words = sorted(set(re.findall(r"(REPRODUCED|NOT_VERIFIABLE|ERROR)", bug.stdout or "")))
     print(f"{case_id}/{agent_id}: cplus bug exit={bug.returncode} words={verdict_words} "
           f"{baseline_summary(spec) if spec.is_file() else 'no bug spec written'}", flush=True)
+    for label, stream in (("stdout", bug.stdout), ("stderr", bug.stderr)):  # TEMPORARY diagnosis, not for main
+        tail = [line[:200] for line in (stream or "").splitlines() if line.strip()][-40:]
+        print(f"{case_id}/{agent_id}: cplus bug {label} tail:", flush=True)
+        for line in tail:
+            print(f"    | {line}", flush=True)
     if bug.returncode or "REPRODUCED" not in bug.stdout or not spec.is_file():
         raise CaseExecutionError("cplus bug baseline", "reference test did not reproduce")
     started = time.monotonic()
