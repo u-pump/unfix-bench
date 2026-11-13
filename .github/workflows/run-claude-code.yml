@@ -190,9 +190,9 @@ jobs:
         # supports ("FATAL: ThreadSanitizer: unexpected memory mapping"); cases built with TSan
         # then fail before running any test. The local machine does not have this limit.
         run: |
-          sysctl vm.mmap_rnd_bits
+          sudo sysctl vm.mmap_rnd_bits
           sudo sysctl -w vm.mmap_rnd_bits=28
-          sysctl vm.mmap_rnd_bits
+          sudo sysctl vm.mmap_rnd_bits
       - name: Install private verifier
         if: steps.place.outputs.has_patch == 'true'
         env:

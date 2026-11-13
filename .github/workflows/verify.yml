@@ -82,9 +82,9 @@ jobs:
         # supports ("FATAL: ThreadSanitizer: unexpected memory mapping"); cases built with TSan
         # then fail before running any test. The local machine does not have this limit.
         run: |
-          sysctl vm.mmap_rnd_bits
+          sudo sysctl vm.mmap_rnd_bits
           sudo sysctl -w vm.mmap_rnd_bits=28
-          sysctl vm.mmap_rnd_bits
+          sudo sysctl vm.mmap_rnd_bits
       - name: Detect submitted patches
         id: patches
         run: echo "has_patch=$(python scripts/verify_cases.py --has-patches)" >> "$GITHUB_OUTPUT"
