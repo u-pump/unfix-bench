@@ -183,7 +183,8 @@ cmd_proxy_log() {
 }
 
 cmd_down() {
-    load_state 2>/dev/null || return 0
+    [ -f "$STATE_FILE" ] || return 0
+    load_state
     docker rm -f "$PROXY_NAME" >/dev/null 2>&1 || true
     docker network rm "$INTERNAL_NET" "$EGRESS_NET" >/dev/null 2>&1 || true
     docker rmi -f "$AGENT_IMAGE" "$PROXY_IMAGE" >/dev/null 2>&1 || true

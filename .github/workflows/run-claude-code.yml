@@ -17,6 +17,14 @@ on:
         required: false
         type: boolean
         default: false
+  # A change to the sandbox re-runs the isolation proof (no secrets, no attempt).
+  pull_request:
+    paths:
+      - 'docker/**'
+      - 'scripts/agent_sandbox.sh'
+      - 'scripts/probe_inputs.sh'
+      - 'scripts/check_input.py'
+      - '.github/workflows/run-claude-code.yml'
 
 permissions:
   contents: read
@@ -30,7 +38,7 @@ env:
 
 jobs:
   plan:
-    if: ${{ !inputs.probe_only && github.actor == 'u-pump' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.probe_only && github.actor == 'u-pump' }}
     runs-on: ubuntu-latest
     outputs:
       cases: ${{ steps.plan.outputs.cases }}
@@ -50,7 +58,7 @@ jobs:
           echo "cases=$cases" >> "$GITHUB_OUTPUT"
 
   probe:
-    if: ${{ inputs.probe_only && github.actor == 'u-pump' }}
+    if: ${{ (github.event_name != 'workflow_dispatch' || inputs.probe_only) && github.actor == 'u-pump' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -89,7 +97,7 @@ jobs:
           retention-days: 7
 
   agent:
-    if: ${{ !inputs.probe_only && github.actor == 'u-pump' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.probe_only && github.actor == 'u-pump' }}
     needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -127,7 +135,7 @@ jobs:
           retention-days: 7
 
   verify:
-    if: ${{ always() && !inputs.probe_only && needs.plan.result == 'success' && github.actor == 'u-pump' }}
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && !inputs.probe_only && needs.plan.result == 'success' && github.actor == 'u-pump' }}
     needs: [plan, agent]
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -200,7 +208,7 @@ jobs:
           retention-days: 7
 
   record:
-    if: ${{ always() && !inputs.probe_only && needs.verify.result != 'skipped' && github.actor == 'u-pump' }}
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && !inputs.probe_only && needs.verify.result != 'skipped' && github.actor == 'u-pump' }}
     needs: verify
     runs-on: ubuntu-latest
     permissions:
