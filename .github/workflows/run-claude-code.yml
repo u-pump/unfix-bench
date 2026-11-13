@@ -1,0 +1,240 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 U-Pump
+name: Run Claude Code attempt
+
+# Owner-triggered. Runs Claude Code once per open case inside a Docker sandbox whose only
+# reachable host is api.anthropic.com, then verifies the patch with the same verifier as
+# every other agent and opens a pull request with the results. See docs/run-claude-code.md.
+on:
+  workflow_dispatch:
+    inputs:
+      case_id:
+        description: 'Case ID (blank means every case without a recorded first attempt)'
+        required: false
+        type: string
+      probe_only:
+        description: 'Only build the sandbox and prove the network isolation; no API call, no attempt'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: claude-code-run
+  cancel-in-progress: false
+
+env:
+  AGENT_MODEL: claude-opus-5-5
+
+jobs:
+  plan:
+    if: ${{ !inputs.probe_only && github.actor == 'u-pump' }}
+    runs-on: ubuntu-latest
+    outputs:
+      cases: ${{ steps.plan.outputs.cases }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Choose cases
+        id: plan
+        env:
+          INPUT_CASE: ${{ inputs.case_id }}
+        run: |
+          cases=$(python scripts/plan_cases.py "$INPUT_CASE")
+          echo "cases=$cases" >> "$GITHUB_OUTPUT"
+
+  probe:
+    if: ${{ inputs.probe_only && github.actor == 'u-pump' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Build the sandbox
+        run: |
+          mkdir -p "$RUNNER_TEMP/probe"
+          bash scripts/agent_sandbox.sh build | tee "$RUNNER_TEMP/probe/build.log"
+      - name: Start the isolated network and egress proxy
+        run: bash scripts/agent_sandbox.sh up
+      - name: Prove what the container can and cannot reach
+        run: bash scripts/agent_sandbox.sh proof "$RUNNER_TEMP/probe/network-proof.log"
+      - name: Collect the proxy log
+        if: always()
+        run: bash scripts/agent_sandbox.sh proxy-log "$RUNNER_TEMP/probe/proxy.log"
+      - name: Check every frozen input
+        env:
+          BENCH_INPUT_TOKEN: ${{ secrets.BENCH_INPUT_TOKEN }}
+        run: bash scripts/probe_inputs.sh "$RUNNER_TEMP/probe/input-check.log"
+      - name: Remove the sandbox
+        if: always()
+        run: bash scripts/agent_sandbox.sh down
+      - name: Scan before upload
+        if: always()
+        run: python scripts/collect_agent_run.py scan "$RUNNER_TEMP"/probe/*
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: probe
+          path: ${{ runner.temp }}/probe/
+          retention-days: 7
+
+  agent:
+    if: ${{ !inputs.probe_only && github.actor == 'u-pump' }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        case: ${{ fromJSON(needs.plan.outputs.cases) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Run one attempt
+        env:
+          BENCH_INPUT_TOKEN: ${{ secrets.BENCH_INPUT_TOKEN }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CASE_ID: ${{ matrix.case }}
+        run: bash scripts/run_claude_case.sh "$CASE_ID" "$RUNNER_TEMP/out"
+      - name: Scan everything before upload
+        id: scan
+        if: always()
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          find "$RUNNER_TEMP/out" -type f -print0 | xargs -0 python scripts/collect_agent_run.py scan
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ always() && steps.scan.outcome == 'success' }}
+        with:
+          name: run-${{ matrix.case }}
+          path: ${{ runner.temp }}/out/
+          retention-days: 7
+
+  verify:
+    if: ${{ always() && !inputs.probe_only && needs.plan.result == 'success' && github.actor == 'u-pump' }}
+    needs: [plan, agent]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        case: ${{ fromJSON(needs.plan.outputs.cases) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        continue-on-error: true
+        with:
+          name: run-${{ matrix.case }}
+          path: ${{ runner.temp }}/run
+      - name: Place the recorded attempt
+        id: place
+        env:
+          CASE_ID: ${{ matrix.case }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/final/results/$CASE_ID"
+          run="$RUNNER_TEMP/run/result"
+          if [ -f "$run/agent.yaml" ] && [ -f "$run/agent-fix.patch" ]; then
+            dest="cases/$CASE_ID/agents/claude-code"
+            cp "$run/agent.yaml" "$run/agent-fix.patch" "$dest/"
+            mkdir -p "$RUNNER_TEMP/final/$dest"
+            echo "recorded=true" >> "$GITHUB_OUTPUT"
+            if [ -s "$run/agent-fix.patch" ]; then echo "has_patch=true" >> "$GITHUB_OUTPUT"; fi
+          elif [ -f "$run/results/$CASE_ID/claude-code.md" ]; then
+            cp "$run/results/$CASE_ID/claude-code.md" "$RUNNER_TEMP/final/results/$CASE_ID/"
+          else
+            python scripts/collect_agent_run.py error --case "$CASE_ID" \
+              --reason "agent: no result was produced; see the run log" \
+              --results-dir "$RUNNER_TEMP/final/results"
+          fi
+      - name: Install private verifier
+        if: steps.place.outputs.has_patch == 'true'
+        env:
+          CPLUS_READ_TOKEN: ${{ secrets.CPLUS_READ_TOKEN }}
+        run: bash scripts/install_private.sh
+      - name: Verify with the same verifier as every other agent
+        if: steps.place.outputs.recorded == 'true'
+        env:
+          CPLUS_DATA_DIR: ${{ runner.temp }}/cplus-data
+          RESULTS_DIR: ${{ runner.temp }}/final/results
+          SELECT_CASE: ${{ matrix.case }}
+          SELECT_AGENT: claude-code
+        run: |
+          mkdir -p ../.tmp
+          python scripts/verify_cases.py || true
+          test -f "$RESULTS_DIR/$SELECT_CASE/claude-code.md"
+      - name: Keep the recorded files with the result
+        if: steps.place.outputs.recorded == 'true'
+        env:
+          CASE_ID: ${{ matrix.case }}
+        run: |
+          dest="cases/$CASE_ID/agents/claude-code"
+          cp "$dest/agent.yaml" "$dest/agent-fix.patch" "$RUNNER_TEMP/final/$dest/"
+      - name: Scan before upload
+        run: find "$RUNNER_TEMP/final" -type f -print0 | xargs -0 python scripts/collect_agent_run.py scan
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: final-${{ matrix.case }}
+          path: ${{ runner.temp }}/final/
+          retention-days: 7
+
+  record:
+    if: ${{ always() && !inputs.probe_only && needs.verify.result != 'skipped' && github.actor == 'u-pump' }}
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: final-*
+          path: ${{ runner.temp }}/final
+          merge-multiple: true
+      - name: Update the tree and README from the results
+        run: |
+          cp -R "$RUNNER_TEMP/final/." .
+          python scripts/render_readme.py
+          python scripts/render_readme.py --check
+      - name: Open a pull request for the owner to review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          branch="claude-code-run-${GITHUB_RUN_ID}"
+          git add -A cases results README.md
+          if git diff --cached --quiet; then echo "Nothing to record"; exit 0; fi
+          git -c user.name='unfix-bench-bot' -c user.email='unfix-bench-bot@users.noreply.github.com' \
+            commit -qm "Record Claude Code attempt(s) from run ${GITHUB_RUN_ID}"
+          git push -q origin "HEAD:refs/heads/${branch}"
+          {
+            echo "Results of the [Claude Code run](${RUN_URL}); the log of each case shows the network isolation proof before the agent started."
+            echo
+            echo "Review the patches, metadata and verdicts before merging. Nothing is published until this pull request is merged."
+          } > "$RUNNER_TEMP/body.md"
+          gh pr create --base main --head "$branch" --title "Claude Code attempts (run ${GITHUB_RUN_ID})" --body-file "$RUNNER_TEMP/body.md"
