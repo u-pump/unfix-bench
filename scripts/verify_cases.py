@@ -385,6 +385,15 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
         print(f"{case_id}/{agent_id}: cplus bug {label} tail:", flush=True)
         for line in tail:
             print(f"    | {line}", flush=True)
+    try:  # TEMPORARY diagnosis, not for main
+        for run in json.loads(spec.read_text(encoding="utf-8")).get("runs", [])[:3]:
+            sig = run.get("signature") or {}
+            print(f"    run {run.get('run')}: status={run.get('status')} exit={run.get('exit_code')} "
+                  f"dur={run.get('duration_s')} kind={sig.get('kind')} message={str(sig.get('message'))[:200]!r}", flush=True)
+            for line in (sig.get("error_lines") or [])[:6]:
+                print(f"        err| {str(line)[:200]}", flush=True)
+    except (OSError, ValueError):
+        pass
     if bug.returncode or "REPRODUCED" not in bug.stdout or not spec.is_file():
         raise CaseExecutionError("cplus bug baseline", "reference test did not reproduce")
     started = time.monotonic()
