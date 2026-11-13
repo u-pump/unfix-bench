@@ -1,0 +1,27 @@
+diff --git a/include/fmt/chrono.h b/include/fmt/chrono.h
+index 220e464..4573f54 100644
+--- a/include/fmt/chrono.h
++++ b/include/fmt/chrono.h
+@@ -2038,6 +2038,22 @@ struct formatter<year_month_day, Char> : private formatter<std::tm, Char> {
+     time.tm_year = static_cast<int>(val.year()) - 1900;
+     time.tm_mon = static_cast<int>(static_cast<unsigned>(val.month())) - 1;
+     time.tm_mday = static_cast<int>(static_cast<unsigned>(val.day()));
++    // Compute the day of year and weekday from the civil date.
++    long long y = static_cast<int>(val.year());
++    int m = time.tm_mon + 1;
++    bool leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
++    static constexpr int cum_days[] = {0,   31,  59,  90,  120, 151,
++                                       181, 212, 243, 273, 304, 334};
++    time.tm_yday = cum_days[time.tm_mon] + time.tm_mday - 1 +
++                   (leap && m > 2 ? 1 : 0);
++    // Days since 1970-01-01 (Howard Hinnant's days_from_civil).
++    long long yy = m <= 2 ? y - 1 : y;
++    long long era = (yy >= 0 ? yy : yy - 399) / 400;
++    long long yoe = yy - era * 400;
++    long long doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + time.tm_mday - 1;
++    long long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
++    long long days = era * 146097 + doe - 719468;
++    time.tm_wday = static_cast<int>(((days + 4) % 7 + 7) % 7);  // 1970: Thu
+     if (use_tm_formatter_) return formatter<std::tm, Char>::format(time, ctx);
+     auto w = detail::tm_writer<decltype(ctx.out()), Char>(locale_ref(), false,
+                                                           ctx.out(), time);

@@ -14,14 +14,14 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 | fmt-4933 | [fmt](https://github.com/fmtlib/fmt) | [#4933: named argument count](https://github.com/fmtlib/fmt/pull/4933) | [REJECTED](results/fmt-4933/codex-cli.md) | [PENDING](results/fmt-4933/claude-code.md) |
 | fmt-4942 | [fmt](https://github.com/fmtlib/fmt) | [#4942: zero precision](https://github.com/fmtlib/fmt/pull/4942) | [VERIFIED](results/fmt-4942/codex-cli.md) | [PENDING](results/fmt-4942/claude-code.md) |
 | fmt-4960 | [fmt](https://github.com/fmtlib/fmt) | [#4960: floating-point precision](https://github.com/fmtlib/fmt/pull/4960) | [REJECTED](results/fmt-4960/codex-cli.md) | [PENDING](results/fmt-4960/claude-code.md) |
-| fmt-4978 | [fmt](https://github.com/fmtlib/fmt) | [#4978: calendar formatting](https://github.com/fmtlib/fmt/pull/4978) | [VERIFIED](results/fmt-4978/codex-cli.md) | [PENDING](results/fmt-4978/claude-code.md) |
+| fmt-4978 | [fmt](https://github.com/fmtlib/fmt) | [#4978: calendar formatting](https://github.com/fmtlib/fmt/pull/4978) | [VERIFIED](results/fmt-4978/codex-cli.md) | [VERIFIED](results/fmt-4978/claude-code.md) |
 | spdlog-3049 | [spdlog](https://github.com/gabime/spdlog) | [#3049: concurrent async flush](https://github.com/gabime/spdlog/pull/3049) | [REJECTED](results/spdlog-3049/codex-cli.md) | [PENDING](results/spdlog-3049/claude-code.md) |
 | zlibng-2465 | [zlib-ng](https://github.com/zlib-ng/zlib-ng) | [#2465: inflate boundary](https://github.com/zlib-ng/zlib-ng/pull/2465) | [VERIFIED](results/zlibng-2465/codex-cli.md) | [PENDING](results/zlibng-2465/claude-code.md) |
 
 | Agent | VERIFIED | REJECTED | REVIEW | NOT_VERIFIABLE | NO_PATCH | ERROR | PENDING |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Codex CLI | 4 | 6 | 0 | 0 | 0 | 0 | 0 |
-| Claude Code | 1 | 0 | 0 | 0 | 0 | 0 | 9 |
+| Claude Code | 2 | 0 | 0 | 0 | 0 | 0 | 8 |
 <!-- results:end -->
 
 The tables are generated from the files in [`results/`](results) by `scripts/render_readme.py`; each agent ran once per case.
