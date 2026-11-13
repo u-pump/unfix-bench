@@ -20,6 +20,14 @@ The [Claude Code workflow](run-claude-code.md) needs three more repository secre
 4. **Pull requests from Actions.** **Settings** → **Actions** → **General** → **Workflow permissions** → tick **Allow GitHub Actions to create and approve pull requests**, then **Save**. The record job opens its pull request with the built-in `GITHUB_TOKEN`; GitHub does not start other workflows for such a pull request, so run the checks by hand if you want them on it.
 5. If **Settings** → **Actions** → **General** restricts allowed actions, also permit `actions/checkout`, `actions/setup-python`, `actions/upload-artifact` and `actions/download-artifact` (already required by the verify workflow).
 
-**After all ten runs are done, revoke the Claude token:** delete the `CLAUDE_CODE_OAUTH_TOKEN` secret and revoke the token in the settings of the Claude account that issued it (the account's list of Claude Code sessions and tokens); then check that it no longer works, for example by confirming that a `probe_only` run is unaffected and a new attempt fails authentication. Anthropic's [authentication documentation](https://code.claude.com/docs/en/iam) describes `claude setup-token`. Delete `BENCH_INPUT_TOKEN` as well. If a run ever reports `SECRET FOUND`, revoke the token immediately, whatever else happened.
+**After all ten runs: retire the Claude token on the same day.** Delete the `CLAUDE_CODE_OAUTH_TOKEN` and `BENCH_INPUT_TOKEN` secrets, and delete the token file or shell variable wherever you pasted it. Then read the next paragraph: deleting the secret does not make the token invalid.
+
+**There is no documented way to revoke a `claude setup-token` token.** Anthropic's documentation says only that `claude setup-token` generates "a one-year OAuth token" that "can only make model requests" and is not saved anywhere ([authentication](https://code.claude.com/docs/en/authentication)); that "If you delete a secret, the credential it held stays valid" ([GitHub Actions](https://code.claude.com/docs/en/github-actions)); and that the token "is tied to the subscription of the person who ran `claude setup-token`". The documentation gives no page in claude.ai or the Console that lists or revokes such a token, and it does not say that `claude auth logout` or `/logout` revokes it. The exact interface path is therefore not stated here, because it is not documented. Choices that are open to you:
+- ask Anthropic support (https://support.claude.com) how to revoke a `setup-token` token and keep the answer with the run records;
+- run the benchmark from a Claude account (or a subscription) used only for it, so that an unrevoked token can reach nothing else, and stop the subscription afterwards;
+- otherwise treat the token as live until it expires one year after the date printed by `claude setup-token`, and note that date.
+The token can make model requests on that subscription, nothing else.
+
+If a run ever reports `SECRET FOUND`, retire the token the same way at once, whatever else happened.
 
 Artifacts of this repository are downloadable by anyone who can see it, so a run uploads only files that passed the secret scan and keeps them seven days.

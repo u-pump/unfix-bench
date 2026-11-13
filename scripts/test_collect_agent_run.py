@@ -118,7 +118,14 @@ class SecretScanTest(unittest.TestCase):
 
 class RecordTest(unittest.TestCase):
     def record(self, patch_bytes: bytes) -> dict[str, object]:
-        events = [INIT, tool_use("Bash", "b1", command="ctest"), tool_result("b1", "ok"), SUCCESS]
+        events = [
+            INIT,
+            tool_use("Bash", "b1", command="ctest --secret-marker-xyz"),
+            tool_result("b1", "ok"),
+            tool_use("Edit", "e1"),
+            tool_result("e1", "edited"),
+            {**SUCCESS, "num_turns": 7},
+        ]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "t.jsonl").write_text("\n".join(json.dumps(e) for e in events), encoding="utf-8")
@@ -128,10 +135,12 @@ class RecordTest(unittest.TestCase):
                     "record", "--transcript", str(root / "t.jsonl"), "--patch", str(root / "p.patch"),
                     "--out-dir", str(root), "--version", "2.1.323 (Claude Code)",
                     "--requested-model", "claude-opus-5-5", "--run-url", "https://example.invalid/run",
-                    "--image", "sha256:abc",
+                    "--image", "sha256:abc", "--duration-seconds", "42",
                 ])
             self.assertEqual(code, 0)
-            return json.loads((root / "agent.yaml").read_text(encoding="utf-8"))
+            text = (root / "agent.yaml").read_text(encoding="utf-8")
+            self.assertNotIn("secret-marker-xyz", text)  # the transcript content is never copied
+            return json.loads(text)
 
     def test_patch_run_records_hash_model_and_version(self) -> None:
         data = self.record(b"diff --git a/a b/a\n+x\n")
@@ -139,6 +148,10 @@ class RecordTest(unittest.TestCase):
         self.assertEqual(data["version"], "2.1.323 (Claude Code)")
         self.assertEqual(len(str(data["patch_sha256"])), 64)
         self.assertNotIn("outcome", data)
+        self.assertEqual(
+            data["metrics"],
+            {"bash_commands": 1, "tool_calls": 2, "turns": 7, "duration_seconds": 42},
+        )
         for key in ("name", "invocation", "date_utc", "environment", "attempt_note"):
             self.assertTrue(data[key])
 

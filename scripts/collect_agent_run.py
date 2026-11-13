@@ -160,6 +160,25 @@ def network_attempts(events: list[dict[str, Any]], proxy_log: str = "") -> dict[
     }
 
 
+def transcript_metrics(events: list[dict[str, Any]], duration_seconds: int) -> dict[str, int]:
+    """Counts taken from the transcript, which itself is never published."""
+    tool_uses = [
+        block
+        for event in events
+        if event.get("type") == "assistant"
+        for block in _blocks(event)
+        if block.get("type") == "tool_use"
+    ]
+    results = [e for e in events if e.get("type") == "result"]
+    turns = results[-1].get("num_turns") if results else None
+    return {
+        "bash_commands": sum(1 for block in tool_uses if block.get("name") == "Bash"),
+        "tool_calls": len(tool_uses),
+        "turns": turns if isinstance(turns, int) else 0,
+        "duration_seconds": duration_seconds,
+    }
+
+
 def scan_for_secret(paths: list[Path], token: str | None) -> list[str]:
     """Names of files that contain the token or a token-shaped string. Never returns content."""
     hits: list[str] = []
@@ -186,6 +205,7 @@ def build_agent_yaml(
     image: str,
     proof_note: str,
     date_utc: str,
+    metrics: dict[str, int],
 ) -> dict[str, Any]:
     patch_sha = hashlib.sha256(patch_bytes).hexdigest() if patch_bytes.strip() else None
     data: dict[str, Any] = {
@@ -217,6 +237,7 @@ def build_agent_yaml(
             if patch_sha
             else "First completed attempt; the agent finished without changing any file."
         ),
+        "metrics": metrics,
         "network_attempts": {key: attempt[key] for key in ("count", "commands")},
         "proxy_hosts": {
             "allowed": attempt["proxy_allowed_hosts"],
@@ -258,6 +279,7 @@ def cmd_record(args: argparse.Namespace) -> int:
         image=args.image,
         proof_note=args.proof_note,
         date_utc=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        metrics=transcript_metrics(events, int(args.duration_seconds)),
     )
     _write_json(out_dir / "agent.yaml", data)
     print(f"recorded: model={found['model']} patch_sha256={data['patch_sha256']}")
@@ -310,6 +332,7 @@ def main(argv: list[str]) -> int:
     record = sub.add_parser("record")
     for name in ("transcript", "patch", "out-dir", "version", "requested-model", "run-url", "image"):
         record.add_argument(f"--{name}", required=True)
+    record.add_argument("--duration-seconds", default="0")
     record.add_argument("--proxy-log", default="")
     record.add_argument("--proof-note", default="")
     record.set_defaults(handler=cmd_record)
