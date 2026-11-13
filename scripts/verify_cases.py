@@ -266,6 +266,32 @@ def render(case_id: str, verdict: str, gates: dict[str, str], seconds: float | N
             f"| Check | Status |\n| --- | --- |\n{rows}\n")
 
 
+def baseline_summary(spec_path: Path) -> str:
+    """Numbers only: how the bug baseline went (runs, failures, planned runs after the fix).
+
+    Printed to the job log so a NOT_VERIFIABLE for a missing baseline can be explained.
+    No command output, paths or test text is included.
+    """
+    try:
+        data = json.loads(spec_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "bug baseline: not readable"
+    parts = [f"{key}={data[key]}" for key in ("completed_runs", "failures", "required_runs_after_fix")
+             if isinstance(data.get(key), int)]
+    runs = data.get("runs")
+    if isinstance(runs, list):
+        per_run = []
+        for run in runs:
+            if not isinstance(run, dict):
+                continue
+            fields = [f"{key}={run[key]}" for key in ("exit_code", "timed_out", "duration_seconds", "status", "verdict")
+                      if isinstance(run.get(key), (int, float, bool)) or (
+                          isinstance(run.get(key), str) and re.fullmatch(r"[A-Za-z_ -]{1,24}", run[key]))]
+            per_run.append("{" + ",".join(fields) + "}")
+        parts.append("runs=[" + " ".join(per_run) + "]")
+    return "bug baseline: " + " ".join(parts)
+
+
 def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | None, str | None]:
     case_dir = ROOT / "cases" / case_id
     if not case_dir.is_dir():
@@ -328,6 +354,7 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
     bug = quiet_stage("cplus bug baseline", "reference test did not reproduce", *bug_args)
     if bug.returncode or "REPRODUCED" not in bug.stdout or not spec.is_file():
         raise CaseExecutionError("cplus bug baseline", "reference test did not reproduce")
+    print(f"{case_id}/{agent_id}: {baseline_summary(spec)}", flush=True)
     started = time.monotonic()
     verify_args = ["cplus", "verify", "--project", str(scratch), "--patch",
                    str(patch), "--bug-spec", str(spec),
