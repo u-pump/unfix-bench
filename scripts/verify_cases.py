@@ -70,6 +70,27 @@ def patch_digest(case_id: str, agent_id: str) -> str | None:
     return hashlib.sha256(content).hexdigest() if content.strip() else None
 
 
+def no_patch_recorded(case_id: str, agent_id: str) -> bool:
+    """True when the agent completed its attempt and recorded that it changed nothing."""
+    base = ROOT / "cases" / case_id / "agents" / agent_id
+    try:
+        agent = json.loads((base / "agent.yaml").read_text(encoding="utf-8"))
+        return (base / "agent-fix.patch").read_bytes().strip() == b"" and (
+            agent.get("outcome") == "NO_PATCH" and agent.get("patch_sha256") is None
+        )
+    except (OSError, ValueError):
+        return False
+
+
+def no_patch_report_is_current(case_id: str, agent_id: str) -> bool:
+    report = ROOT / "results" / case_id / f"{agent_id}.md"
+    try:
+        text = report.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return re.search(r"(?m)^Verdict: \*\*NO_PATCH\*\*$", text) is not None
+
+
 def report_is_current(case_id: str, agent_id: str, digest: str) -> bool:
     report = ROOT / "results" / case_id / f"{agent_id}.md"
     metadata = ROOT / "cases" / case_id / "agents" / agent_id / "agent.yaml"
@@ -123,9 +144,13 @@ def selected_pairs() -> list[tuple[str, str]]:
     else:
         candidates = {(case_id, agent_id) for case_id in selected_cases()
                       for agent_id in selected_agents(case_id)}
-    return sorted((case_id, agent_id) for case_id, agent_id in candidates
-                  if (digest := patch_digest(case_id, agent_id))
-                  and not report_is_current(case_id, agent_id, digest))
+    return sorted(
+        (case_id, agent_id) for case_id, agent_id in candidates
+        if ((digest := patch_digest(case_id, agent_id))
+            and not report_is_current(case_id, agent_id, digest))
+        or (no_patch_recorded(case_id, agent_id)
+            and not no_patch_report_is_current(case_id, agent_id))
+    )
 
 
 def extract_json(output: str) -> dict[str, object]:
@@ -213,11 +238,17 @@ def render(case_id: str, verdict: str, gates: dict[str, str], seconds: float | N
     verifier_note = " (configured; not run)" if verdict == "PENDING" else ""
     if verdict == "INFRASTRUCTURE_ERROR":
         verifier_note = " (attempted; no code verdict)"
+    if verdict == "NO_PATCH":
+        verifier_note = " (not run; nothing to verify)"
+    patch_line = (
+        f"sha256 {patch_sha256}" if patch_sha256
+        else "none (empty)" if verdict == "NO_PATCH" else "sha256 pending"
+    )
     reason_line = f"\n\nReason: {reason}" if reason is not None else ""
     note_line = f"\n\nNote: {result_note}" if verdict == "REJECTED" and result_note else ""
     return (f"# {case_id}\n\nVerdict: **{verdict}**{note}{reason_line}{note_line}\n\nElapsed: {duration}\n\n"
             f"Verifier: cplus {VERIFIER_REVISION} · {checked_at_utc}{verifier_note}\n\n"
-            f"Patch: sha256 {patch_sha256 or 'pending'}\n\n"
+            f"Patch: {patch_line}\n\n"
             f"Agent: {agent_name} · Version: {agent_version}\n\n"
             f"| Check | Status |\n| --- | --- |\n{rows}\n")
 
@@ -234,6 +265,12 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
     except (OSError, ValueError) as exc:
         raise CaseExecutionError("parse", "case metadata unavailable") from exc
     if not patch_bytes.strip():
+        if no_patch_recorded(case_id, agent_id):
+            if any(not agent.get(key) for key in (
+                "name", "version", "model", "invocation", "date_utc", "environment", "attempt_note"
+            )):
+                raise CaseExecutionError("parse", "incomplete agent metadata")
+            return "NO_PATCH", {}, None, "the agent finished its attempt without changing any file"
         if patch_bytes or agent.get("patch_sha256") is not None:
             raise CaseExecutionError("parse", "invalid pending patch metadata")
         return "PENDING", {}, None, None

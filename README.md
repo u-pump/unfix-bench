@@ -4,6 +4,7 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 
 ## Results
 
+<!-- results:start -->
 | Case | Project | Bug | Codex CLI | Claude Code |
 | --- | --- | --- | --- | --- |
 | cpp-peglib-121 | [cpp-peglib](https://github.com/yhirose/cpp-peglib) | [#121: start rule with ignore operator](https://github.com/yhirose/cpp-peglib/issues/121) | [REJECTED](results/cpp-peglib-121/codex-cli.md) | [PENDING](results/cpp-peglib-121/claude-code.md) |
@@ -17,12 +18,13 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 | spdlog-3049 | [spdlog](https://github.com/gabime/spdlog) | [#3049: concurrent async flush](https://github.com/gabime/spdlog/pull/3049) | [REJECTED](results/spdlog-3049/codex-cli.md) | [PENDING](results/spdlog-3049/claude-code.md) |
 | zlibng-2465 | [zlib-ng](https://github.com/zlib-ng/zlib-ng) | [#2465: inflate boundary](https://github.com/zlib-ng/zlib-ng/pull/2465) | [VERIFIED](results/zlibng-2465/codex-cli.md) | [PENDING](results/zlibng-2465/claude-code.md) |
 
-| Agent | VERIFIED | REJECTED | PENDING |
-| --- | ---: | ---: | ---: |
-| Codex CLI | 4 | 6 | 0 |
-| Claude Code | 0 | 0 | 10 |
+| Agent | VERIFIED | REJECTED | REVIEW | NOT_VERIFIABLE | NO_PATCH | ERROR | PENDING |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Codex CLI | 4 | 6 | 0 | 0 | 0 | 0 | 0 |
+| Claude Code | 0 | 0 | 0 | 0 | 0 | 0 | 10 |
+<!-- results:end -->
 
-Claude Code is the second agent; its runs are pending in an OS-sandboxed environment.
+The tables are generated from the files in [`results/`](results) by `scripts/render_readme.py`; each agent ran once per case.
 
 ## What the agent got
 
@@ -78,7 +80,7 @@ The focused command above runs the selected `bug_test`; the CTest command runs t
 - Ten cases is a small sample; seven are from fmt.
 - In fmt-4960, the reference test was chosen after the agent run. The selection rule was applied retrospectively and documented in [the case file](cases/fmt-4960/case.yaml); the patch was never edited.
 - The verifier is not open source yet. Public reports contain the verdict, eight check statuses, and elapsed time.
-- One agent has results so far; Claude Code is next.
+- One attempt per agent and case measures that attempt, not a success rate; the conditions of the two agents differ in the ways listed in the [protocol](docs/protocol.md#conditions-codex-cli-and-claude-code).
 
 ## Found a wrong verdict?
 
