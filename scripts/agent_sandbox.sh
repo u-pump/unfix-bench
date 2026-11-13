@@ -148,7 +148,8 @@ cmd_proof() {
         case "$out" in
             *"unknown option"*|*"invalid"*"choice"*|*"did you mean"*)
                 printf 'FAIL  %-58s %s\n' "Claude Code accepts the invocation flags" "${out:0:300}"; PROOF_FAILED=1 ;;
-            *) printf 'OK    %-58s\n' "Claude Code accepts the invocation flags (no login: expected failure)" ;;
+            *) printf 'OK    %-58s\n' "Claude Code accepts the invocation flags (no login: expected failure)"
+               printf '      claude printed: %s\n' "$(printf '%s' "${out:0:240}" | tr '\n' ' ')" ;;
         esac
         if [ "$PROOF_FAILED" -eq 0 ]; then echo "RESULT: all proofs passed"; else echo "RESULT: PROOF FAILED"; fi
     } 2>&1 | tee "$log"
