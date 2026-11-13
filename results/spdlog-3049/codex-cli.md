@@ -6,6 +6,8 @@ Reason: judged by upstream reference test 'multithread flush'; the patch did not
 
 Note: agent implemented the wait but broke the upstream discard_new behaviour (differs from expected upstream behaviour)
 
+Input: bench-in-spdlog-3049 differs from the upstream base in 5 non-test files (.gitignore, INSTALL, LICENSE, README.md, cmake/spdlogConfig.cmake.in): CRLF line endings became LF. The executable bit of files is not preserved in the bench-in repositories (all cases). Both agents receive the same input; the patch is verified against the upstream base.
+
 Elapsed: 87.1 s
 
 Verifier: cplus 81c0fda242fef1daf55d3164e06127d372c81caa · 2026-10-24 14:16:42 UTC

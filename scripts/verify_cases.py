@@ -202,6 +202,17 @@ def agent_result_note(case_id: str, agent_id: str) -> str | None:
     return note
 
 
+def case_input_note(case_id: str) -> str | None:
+    """One public line about how this case's agent input differs from upstream, if any."""
+    path = ROOT / "cases" / case_id / "input-note.txt"
+    if not path.is_file():
+        return None
+    note = path.read_text(encoding="utf-8").strip()
+    if not note or "\n" in note or len(note) > 600:
+        raise CaseExecutionError("parse", "invalid case input note")
+    return note
+
+
 def gate_reason(gate: dict[str, object]) -> str:
     name = str(gate["name"])
     evidence = gate.get("evidence")
@@ -231,7 +242,7 @@ def summary_reason(raw: object, fallback: str) -> str:
 def render(case_id: str, verdict: str, gates: dict[str, str], seconds: float | None,
            agent_name: str, agent_version: str, checked_at_utc: str,
            reason: str | None = None, result_note: str | None = None,
-           patch_sha256: str | None = None) -> str:
+           patch_sha256: str | None = None, input_note: str | None = None) -> str:
     duration = "pending" if seconds is None else f"{seconds:.1f} s"
     rows = "\n".join(f"| {gate} | {gates.get(gate, 'SKIPPED')} |" for gate in GATES)
     note = "\n\nStatus: no agent fix yet" if verdict == "PENDING" else ""
@@ -246,6 +257,8 @@ def render(case_id: str, verdict: str, gates: dict[str, str], seconds: float | N
     )
     reason_line = f"\n\nReason: {reason}" if reason is not None else ""
     note_line = f"\n\nNote: {result_note}" if verdict == "REJECTED" and result_note else ""
+    if input_note:
+        note_line += f"\n\nInput: {input_note}"
     return (f"# {case_id}\n\nVerdict: **{verdict}**{note}{reason_line}{note_line}\n\nElapsed: {duration}\n\n"
             f"Verifier: cplus {VERIFIER_REVISION} · {checked_at_utc}{verifier_note}\n\n"
             f"Patch: {patch_line}\n\n"
@@ -374,10 +387,12 @@ def main() -> int:
     for case_id, agent_id in selected_pairs():
         agent_name, agent_version = "not recorded", "not recorded"
         result_note = None
+        input_note = None
         try:
             agent_name, agent_version = agent_identity(case_id, agent_id)
             verdict, gates, seconds, reason = run_case(case_id, agent_id)
             result_note = agent_result_note(case_id, agent_id)
+            input_note = case_input_note(case_id)
         except Exception as exc:
             public_reason = (exc.public_reason if isinstance(exc, CaseExecutionError)
                              else "parse: unexpected case processing error")
@@ -389,7 +404,7 @@ def main() -> int:
         result.parent.mkdir(parents=True, exist_ok=True)
         result.write_text(
             render(case_id, verdict, gates, seconds, agent_name, agent_version, checked_at_utc,
-                   reason, result_note, patch_digest(case_id, agent_id)),
+                   reason, result_note, patch_digest(case_id, agent_id), input_note),
             encoding="utf-8",
         )
         label = f"{verdict} - no agent fix yet" if verdict == "PENDING" else verdict
