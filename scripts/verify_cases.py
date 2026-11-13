@@ -202,6 +202,32 @@ def agent_result_note(case_id: str, agent_id: str) -> str | None:
     return note
 
 
+def agent_attempt_note(case_id: str, agent_id: str) -> str | None:
+    """A public line about an attempt that is not the plain first one (for example a rerun)."""
+    path = ROOT / "cases" / case_id / "agents" / agent_id / "attempt-note.txt"
+    if not path.is_file():
+        return None
+    note = path.read_text(encoding="utf-8").strip()
+    if not note or "\n" in note or len(note) > 600:
+        raise CaseExecutionError("parse", "invalid attempt note")
+    return note
+
+
+def agent_network_note(case_id: str, agent_id: str) -> str | None:
+    """Proxy-counted network traffic of the agent run, from its recorded metadata (if any)."""
+    path = ROOT / "cases" / case_id / "agents" / agent_id / "agent.yaml"
+    try:
+        proxy = json.loads(path.read_text(encoding="utf-8")).get("proxy")
+    except (OSError, ValueError):
+        return None
+    if not isinstance(proxy, dict) or not isinstance(proxy.get("refused"), dict):
+        return None
+    refused = ", ".join(f"{host} x{count}" for host, count in proxy["refused"].items()) or "none"
+    allowed = ", ".join(f"{host} x{count}" for host, count in proxy.get("allowed_connections", {}).items()) or "none"
+    return (f"the proxy refused {int(proxy.get('refused_requests', 0))} request(s) from the agent run ({refused}); "
+            f"allowed connections: {allowed}. Counted from the proxy log; the isolation proof's own requests are excluded.")
+
+
 def case_input_note(case_id: str) -> str | None:
     """One public line about how this case's agent input differs from upstream, if any."""
     path = ROOT / "cases" / case_id / "input-note.txt"
@@ -242,7 +268,8 @@ def summary_reason(raw: object, fallback: str) -> str:
 def render(case_id: str, verdict: str, gates: dict[str, str], seconds: float | None,
            agent_name: str, agent_version: str, checked_at_utc: str,
            reason: str | None = None, result_note: str | None = None,
-           patch_sha256: str | None = None, input_note: str | None = None) -> str:
+           patch_sha256: str | None = None, input_note: str | None = None,
+           attempt_note: str | None = None, network_note: str | None = None) -> str:
     duration = "pending" if seconds is None else f"{seconds:.1f} s"
     rows = "\n".join(f"| {gate} | {gates.get(gate, 'SKIPPED')} |" for gate in GATES)
     note = "\n\nStatus: no agent fix yet" if verdict == "PENDING" else ""
@@ -259,6 +286,10 @@ def render(case_id: str, verdict: str, gates: dict[str, str], seconds: float | N
     note_line = f"\n\nNote: {result_note}" if verdict == "REJECTED" and result_note else ""
     if input_note:
         note_line += f"\n\nInput: {input_note}"
+    if attempt_note:
+        note_line += f"\n\nAttempt: {attempt_note}"
+    if network_note:
+        note_line += f"\n\nNetwork: {network_note}"
     return (f"# {case_id}\n\nVerdict: **{verdict}**{note}{reason_line}{note_line}\n\nElapsed: {duration}\n\n"
             f"Verifier: cplus {VERIFIER_REVISION} · {checked_at_utc}{verifier_note}\n\n"
             f"Patch: {patch_line}\n\n"
@@ -388,11 +419,15 @@ def main() -> int:
         agent_name, agent_version = "not recorded", "not recorded"
         result_note = None
         input_note = None
+        attempt_note = None
+        network_note = None
         try:
             agent_name, agent_version = agent_identity(case_id, agent_id)
             verdict, gates, seconds, reason = run_case(case_id, agent_id)
             result_note = agent_result_note(case_id, agent_id)
             input_note = case_input_note(case_id)
+            attempt_note = agent_attempt_note(case_id, agent_id)
+            network_note = agent_network_note(case_id, agent_id)
         except Exception as exc:
             public_reason = (exc.public_reason if isinstance(exc, CaseExecutionError)
                              else "parse: unexpected case processing error")
@@ -404,7 +439,7 @@ def main() -> int:
         result.parent.mkdir(parents=True, exist_ok=True)
         result.write_text(
             render(case_id, verdict, gates, seconds, agent_name, agent_version, checked_at_utc,
-                   reason, result_note, patch_digest(case_id, agent_id), input_note),
+                   reason, result_note, patch_digest(case_id, agent_id), input_note, attempt_note, network_note),
             encoding="utf-8",
         )
         label = f"{verdict} - no agent fix yet" if verdict == "PENDING" else verdict

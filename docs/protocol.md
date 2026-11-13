@@ -8,6 +8,8 @@
 
 The original `fmt-4960` `bug_test` field named `compile_test.high_precision_constexpr_float`. It was changed after the agent run. A retrospective audit of the upstream diff found that this first test and the second test (`memory_buffer_test.constexpr_grow`) do not fail on the base 3/3; the third (`format_test.high_precision_trailing_zeros`) does. The final choice follows the rule above, but this case does **not** meet its prospective-freeze requirement. This exception remains visible in the case metadata; no agent patch was edited.
 
+**Attempt lost by the test bench.** If the agent finished its work but the bench lost the patch before any verification (for example the patch could not be saved because of a bench bug), no patch exists and no verdict was ever known, so the attempt cannot influence anything. The case is rerun **once**, with an explicit note in its report (`cases/<id>/agents/<agent-id>/attempt-note.txt`, shown as an `Attempt:` line): the first attempt was lost because of the bench error (run and cause named), no verdict for it was known, and this is the rerun. The rule does not apply once a patch has been saved or judged: such an attempt is final whatever its verdict, and a second lost attempt is not rerun without the owner's decision. Which cases were rerun under this rule is visible in the reports.
+
 ## Running the agents
 
 **Codex CLI** is run by the owner on a local Windows machine with [the local script](run-agent.md), once per case. It clones only the private `bench-in-<id>` snapshot, passes the exact `TASK.md` text, records the first patch without build output, and deletes the checkout.

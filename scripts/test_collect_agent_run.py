@@ -150,7 +150,7 @@ class RecordTest(unittest.TestCase):
         self.assertNotIn("outcome", data)
         self.assertEqual(
             data["metrics"],
-            {"bash_commands": 1, "tool_calls": 2, "turns": 7, "duration_seconds": 42},
+            {"bash_commands": 1, "tool_calls": 2, "turns": 7, "duration_seconds": 42, "tokens": None},
         )
         for key in ("name", "invocation", "date_utc", "environment", "attempt_note"):
             self.assertTrue(data[key])

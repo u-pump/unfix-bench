@@ -15,6 +15,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,14 @@ TOKEN_ENV = "ANTHROPIC_API_KEY"
 TOKEN_SHAPE = re.compile(r"sk-ant-[A-Za-z0-9_-]{20,}")
 DENIED_HOST = re.compile(r'refused on filtered domain "([^"]+)"')
 ALLOWED_HOST = re.compile(r'Established connection to host "([^"]+)"')
+PROXY_REQUEST = re.compile(r"Request \(file descriptor \d+\): CONNECT ([^\s:]+):(\d+)")
+PROXY_PORT_REFUSED = re.compile(r"Refused CONNECT method on port (\d+)")
+TOKEN_FIELDS = (
+    ("input", "input_tokens"),
+    ("output", "output_tokens"),
+    ("cache_creation_input", "cache_creation_input_tokens"),
+    ("cache_read_input", "cache_read_input_tokens"),
+)
 EXIT_CODE = re.compile(
     r"(?im)^\s*(?:Exit code|Process exited with code|Command exited with code)\s*:?\s*(\d+)"
 )
@@ -160,7 +169,66 @@ def network_attempts(events: list[dict[str, Any]], proxy_log: str = "") -> dict[
     }
 
 
-def transcript_metrics(events: list[dict[str, Any]], duration_seconds: int) -> dict[str, int]:
+def proxy_counts(log: str) -> dict[str, Counter[str]]:
+    """Requests the proxy refused, and connections it allowed, counted per host from its log."""
+    denied: Counter[str] = Counter()
+    allowed: Counter[str] = Counter()
+    last = ""
+    for line in log.splitlines():
+        request = PROXY_REQUEST.search(line)
+        if request:
+            last = f"{request.group(1)}:{request.group(2)}"
+            continue
+        domain = DENIED_HOST.search(line)
+        if domain:
+            denied[domain.group(1)] += 1
+            continue
+        port = PROXY_PORT_REFUSED.search(line)
+        if port:
+            denied[last or f"port {port.group(1)}"] += 1
+            continue
+        host = ALLOWED_HOST.search(line)
+        if host:
+            allowed[host.group(1)] += 1
+    return {"denied": denied, "allowed": allowed}
+
+
+def agent_proxy_traffic(full_log: str, before_agent_log: str = "") -> dict[str, Any]:
+    """Proxy traffic of the agent run only: the log at the end minus the log after the proof.
+
+    The isolation proof makes its own refused requests (github.com, example.com, a bad
+    port); they are taken from the snapshot made right after the proof and left out.
+    """
+    full, base = proxy_counts(full_log), proxy_counts(before_agent_log)
+    denied = full["denied"] - base["denied"]
+    allowed = full["allowed"] - base["allowed"]
+    return {
+        "refused_requests": sum(denied.values()),
+        "refused": dict(sorted(denied.items())),
+        "allowed_connections": dict(sorted(allowed.items())),
+        "scope": "agent run only, counted from the proxy log; the isolation proof's requests are excluded",
+    }
+
+
+def token_usage(events: list[dict[str, Any]]) -> dict[str, int] | None:
+    """Token totals of the run (numbers only), or None when the transcript has no usage."""
+    results = [e for e in events if e.get("type") == "result" and isinstance(e.get("usage"), dict)]
+    totals: dict[str, int] | None = None
+    if results:
+        usage = results[-1]["usage"]
+        totals = {name: int(usage.get(key) or 0) for name, key in TOKEN_FIELDS}
+    else:
+        seen: dict[str, dict[str, Any]] = {}
+        for index, event in enumerate(events):
+            message = event.get("message")
+            if event.get("type") == "assistant" and isinstance(message, dict) and isinstance(message.get("usage"), dict):
+                seen[str(message.get("id") or f"anon-{index}")] = message["usage"]
+        if seen:
+            totals = {name: sum(int(u.get(key) or 0) for u in seen.values()) for name, key in TOKEN_FIELDS}
+    return totals
+
+
+def transcript_metrics(events: list[dict[str, Any]], duration_seconds: int) -> dict[str, Any]:
     """Counts taken from the transcript, which itself is never published."""
     tool_uses = [
         block
@@ -176,6 +244,7 @@ def transcript_metrics(events: list[dict[str, Any]], duration_seconds: int) -> d
         "tool_calls": len(tool_uses),
         "turns": turns if isinstance(turns, int) else 0,
         "duration_seconds": duration_seconds,
+        "tokens": token_usage(events),
     }
 
 
@@ -205,7 +274,9 @@ def build_agent_yaml(
     image: str,
     proof_note: str,
     date_utc: str,
-    metrics: dict[str, int],
+    metrics: dict[str, Any],
+    proxy: dict[str, Any],
+    attempt_note: str | None = None,
 ) -> dict[str, Any]:
     patch_sha = hashlib.sha256(patch_bytes).hexdigest() if patch_bytes.strip() else None
     data: dict[str, Any] = {
@@ -232,17 +303,14 @@ def build_agent_yaml(
         ),
         "session_id": session_id,
         "patch_sha256": patch_sha,
-        "attempt_note": (
+        "attempt_note": attempt_note or (
             "First completed attempt; build*/ output excluded from the patch."
             if patch_sha
             else "First completed attempt; the agent finished without changing any file."
         ),
         "metrics": metrics,
-        "network_attempts": {key: attempt[key] for key in ("count", "commands")},
-        "proxy_hosts": {
-            "allowed": attempt["proxy_allowed_hosts"],
-            "denied": attempt["proxy_denied_hosts"],
-        },
+        "network_commands_seen_in_transcript": attempt["commands"],
+        "proxy": proxy,
         "run_url": run_url,
         "image": image,
         "network_proof": proof_note,
@@ -260,6 +328,12 @@ def cmd_record(args: argparse.Namespace) -> int:
     proxy_log = ""
     if args.proxy_log:
         proxy_log = Path(args.proxy_log).read_text(encoding="utf-8", errors="replace")
+    baseline = ""
+    if args.proxy_baseline and Path(args.proxy_baseline).is_file():
+        baseline = Path(args.proxy_baseline).read_text(encoding="utf-8", errors="replace")
+    attempt_note = None
+    if args.attempt_note_file and Path(args.attempt_note_file).is_file():
+        attempt_note = Path(args.attempt_note_file).read_text(encoding="utf-8").strip() or None
     events = load_events(Path(args.transcript))
     out_dir = Path(args.out_dir)
     try:
@@ -280,6 +354,8 @@ def cmd_record(args: argparse.Namespace) -> int:
         proof_note=args.proof_note,
         date_utc=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         metrics=transcript_metrics(events, int(args.duration_seconds)),
+        proxy=agent_proxy_traffic(proxy_log, baseline),
+        attempt_note=attempt_note,
     )
     _write_json(out_dir / "agent.yaml", data)
     print(f"recorded: model={found['model']} patch_sha256={data['patch_sha256']}")
@@ -334,6 +410,8 @@ def main(argv: list[str]) -> int:
         record.add_argument(f"--{name}", required=True)
     record.add_argument("--duration-seconds", default="0")
     record.add_argument("--proxy-log", default="")
+    record.add_argument("--proxy-baseline", default="")
+    record.add_argument("--attempt-note-file", default="")
     record.add_argument("--proof-note", default="")
     record.set_defaults(handler=cmd_record)
     error = sub.add_parser("error")
