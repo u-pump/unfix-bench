@@ -5,6 +5,7 @@
 # One Claude Code attempt on one case, inside the Docker sandbox of agent_sandbox.sh.
 #
 # Usage: run_claude_case.sh <case-id> <out-dir>
+# With DRY_RUN=1 it stops after the isolation proof, before the agent, and needs no API key.
 # Environment: BENCH_INPUT_TOKEN (read access to u-pump/bench-in-*),
 #              ANTHROPIC_API_KEY, AGENT_MODEL, GITHUB_RUN_URL.
 #
@@ -19,7 +20,7 @@ CASE_ID=${1:?case id}
 OUT=${2:?out dir}
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
-SANDBOX="$HERE/agent_sandbox.sh"
+SANDBOX=(bash "$HERE/agent_sandbox.sh")
 MODEL=${AGENT_MODEL:?AGENT_MODEL}
 PY=${PYTHON:-python3}
 TMP=${RUNNER_TEMP:-/tmp}
@@ -38,13 +39,15 @@ fail() {
 }
 
 cleanup() {
-    "$SANDBOX" down >/dev/null 2>&1 || true
+    "${SANDBOX[@]}" down >/dev/null 2>&1 || true
     rm -rf "$WORK" "$UPSTREAM" "$PRIV" "${ASKPASS:-}"
 }
 trap cleanup EXIT
 
 [ -n "${BENCH_INPUT_TOKEN:-}" ] || fail "input: BENCH_INPUT_TOKEN is not configured"
-[ -n "${ANTHROPIC_API_KEY:-}" ] || fail "auth: ANTHROPIC_API_KEY is not configured"
+if [ -z "${DRY_RUN:-}" ]; then
+    [ -n "${ANTHROPIC_API_KEY:-}" ] || fail "auth: ANTHROPIC_API_KEY is not configured"
+fi
 
 case_file="$ROOT/cases/$CASE_ID/case.yaml"
 [ -f "$case_file" ] || fail "input: unknown case"
@@ -73,24 +76,33 @@ cat "$PRIV/input-check.log"
     "$WORK/TASK.md" "$PRIV/task.txt"
 
 # 3. Build the sandbox and prove what it blocks, before the agent runs.
-"$SANDBOX" build > "$PRIV/build.log" 2>&1 || fail "sandbox: image build failed"
+# The sandbox logs hold only build and probe output, never agent content, so they are
+# printed when a step fails; the agent's own output never is.
+if ! "${SANDBOX[@]}" build > "$PRIV/build.log" 2>&1; then
+    cat "$PRIV/build.log"
+    fail "sandbox: image build failed"
+fi
 VERSION=$(sed -n 's/^claude version: //p' "$PRIV/build.log")
 IMAGE_ID=$(sed -n 's/^agent image id: //p' "$PRIV/build.log")
-"$SANDBOX" up || fail "sandbox: egress proxy did not start"
-"$SANDBOX" proof "$OUT/evidence/network-proof.log" || fail "sandbox: network isolation proof failed"
+"${SANDBOX[@]}" up || fail "sandbox: egress proxy did not start"
+"${SANDBOX[@]}" proof "$OUT/evidence/network-proof.log" || fail "sandbox: network isolation proof failed"
+if [ -n "${DRY_RUN:-}" ]; then
+    echo "dry run: input checked and sandbox proven; stopped before the agent, no API call"
+    exit 0
+fi
 
 # 4. One attempt. Only the exit status and the files in $WORK are kept; the transcript
 #    goes to the private directory and is never printed.
 started=$(date +%s)
-"$SANDBOX" agent "$WORK" "$PRIV/task.txt" "$PRIV/transcript.jsonl" "$PRIV/agent-stderr.log" "$MODEL"
+"${SANDBOX[@]}" agent "$WORK" "$PRIV/task.txt" "$PRIV/transcript.jsonl" "$PRIV/agent-stderr.log" "$MODEL"
 agent_exit=$?
 duration=$(( $(date +%s) - started ))
-"$SANDBOX" proxy-log "$OUT/evidence/proxy.log"
+"${SANDBOX[@]}" proxy-log "$OUT/evidence/proxy.log"
 if [ "$agent_exit" -eq 124 ] || [ "$agent_exit" -eq 137 ]; then fail "agent: timed out after 60 minutes"; fi
 [ "$agent_exit" -eq 0 ] || fail "agent: Claude Code exited with code $agent_exit"
 
 # 5. Save the first patch exactly as produced, then the evidence.
-"$SANDBOX" patch "$WORK" "$OUT/result" || fail "agent: could not save the patch"
+"${SANDBOX[@]}" patch "$WORK" "$OUT/result" || fail "agent: could not save the patch"
 "$PY" "$HERE/collect_agent_run.py" record --transcript "$PRIV/transcript.jsonl" \
     --patch "$OUT/result/agent-fix.patch" --out-dir "$PRIV" --version "$VERSION" \
     --requested-model "$MODEL" --run-url "${GITHUB_RUN_URL:-local}" --image "$IMAGE_ID" \
