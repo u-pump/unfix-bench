@@ -178,7 +178,7 @@ cmd_patch() {
     load_state
     local work=$1 out=$2
     docker run --rm --network none "${hardening[@]}" -v "$work":/work:rw -v "$out":/out:rw -w /work "$AGENT_IMAGE" \
-        sh -c 'git -c safe.directory=/work -c core.hooksPath=/dev/null -c core.fsmonitor= add -A -- . ":(exclude,glob)build*/**" ":(exclude,glob)**/build*/**" \
+        sh -c 'git -c safe.directory=/work -c core.hooksPath=/dev/null -c core.fsmonitor= add -A -- . ":(exclude,glob)**/build*/**" \
             && git -c safe.directory=/work -c core.hooksPath=/dev/null -c core.fsmonitor= diff --cached --binary --no-ext-diff --no-textconv HEAD > /out/agent-fix.patch'
 }
 

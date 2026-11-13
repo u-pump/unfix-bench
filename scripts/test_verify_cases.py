@@ -20,11 +20,16 @@ class VerifyCasesSmokeTest(unittest.TestCase):
     def test_changed_pairs_ignore_rename_and_current_report(self) -> None:
         source = verify_cases.ROOT / "cases" / "fmt-4800" / "agents"
         existing = (verify_cases.ROOT / "results" / "fmt-4800" / "codex-cli.md").read_bytes()
-        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2] / ".tmp") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for agent_id in ("codex-cli", "claude-code"):
                 target = root / "cases" / "fmt-4800" / "agents" / agent_id
                 target.mkdir(parents=True)
+                if agent_id == "claude-code":
+                    # A case with no recorded attempt, whatever the repository holds today.
+                    (target / "agent.yaml").write_text(json.dumps({"patch_sha256": None}), encoding="utf-8")
+                    (target / "agent-fix.patch").write_bytes(b"")
+                    continue
                 for name in ("agent.yaml", "agent-fix.patch"):
                     (target / name).write_bytes((source / agent_id / name).read_bytes())
             result = root / "results" / "fmt-4800" / "codex-cli.md"
@@ -60,7 +65,7 @@ class VerifyCasesSmokeTest(unittest.TestCase):
 
     def test_all_agent_pairs_get_separate_reports(self) -> None:
         source = verify_cases.ROOT / "cases" / "cpp-peglib-121"
-        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2] / ".tmp") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             case_dir = root / "cases" / "cpp-peglib-121"
             for agent_id in ("claude-code", "codex-cli"):
@@ -82,7 +87,7 @@ class VerifyCasesSmokeTest(unittest.TestCase):
 
     def test_empty_patch_is_pending_and_hash_mismatch_stops_verification(self) -> None:
         source = verify_cases.ROOT / "cases" / "cpp-peglib-121"
-        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2] / ".tmp") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             case_dir = root / "cases" / "cpp-peglib-121"
             for agent_id in ("claude-code", "codex-cli"):
@@ -113,7 +118,7 @@ class VerifyCasesSmokeTest(unittest.TestCase):
                     self.assertEqual(case["reference_test_name"], case["bug_test"])
 
     def test_run_case_uses_public_verifier_summary(self) -> None:
-        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2] / ".tmp") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
 
             def fake_quiet(*args: str, cwd: Path | None = None):
@@ -167,7 +172,7 @@ class VerifyCasesSmokeTest(unittest.TestCase):
             "agent implemented the wait but broke the upstream discard_new behaviour "
             "(differs from expected upstream behaviour)"
         )
-        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2] / ".tmp") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             case_dir = root / "cases" / "spdlog-3049"
             agent_dir = case_dir / "agents" / "codex-cli"
@@ -200,7 +205,7 @@ class VerifyCasesSmokeTest(unittest.TestCase):
         )
 
     def test_infrastructure_error_reports_generic_reason_without_exception_details(self) -> None:
-        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2] / ".tmp") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             with (patch.object(verify_cases, "ROOT", root),
                   patch.object(verify_cases, "RESULTS_DIR", root / "results"),
@@ -216,7 +221,7 @@ class VerifyCasesSmokeTest(unittest.TestCase):
             self.assertNotIn("PRIVATE_CPLUS_LOG", result)
 
     def test_infrastructure_stages_have_safe_public_reasons(self) -> None:
-        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2] / ".tmp") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
 
             def fake_quiet(*args: str, cwd: Path | None = None):
@@ -259,7 +264,7 @@ class VerifyCasesSmokeTest(unittest.TestCase):
             self.assertEqual(caught.exception.stage, "clone")
 
     def test_inconclusive_verifier_diagnostic_stays_out_of_public_report(self) -> None:
-        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2] / ".tmp") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
             current_verdict = "NOT_VERIFIABLE"
 
@@ -297,7 +302,7 @@ class VerifyCasesSmokeTest(unittest.TestCase):
 
     def test_multi_test_reference_is_focused_for_bug_and_verified_by_name(self) -> None:
         source = Path(__file__).resolve().parents[1] / "cases" / "fmt-4490"
-        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2] / ".tmp") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             case_dir = root / "cases" / "fmt-4490"
             case_dir.mkdir(parents=True)
@@ -352,7 +357,7 @@ class VerifyCasesSmokeTest(unittest.TestCase):
 
     def test_one_case_without_private_verifier_or_token(self) -> None:
         source = Path(__file__).resolve().parents[1] / "cases" / "cpp-peglib-121"
-        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2] / ".tmp") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             case_dir = root / "cases" / "cpp-peglib-121"
             case_dir.mkdir(parents=True)
@@ -424,7 +429,7 @@ class VerifyCasesSmokeTest(unittest.TestCase):
         self.assertIn(f"Reason: {summary}", report)
 
     def test_reference_reason_is_used_even_when_a_gate_fails(self) -> None:
-        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2] / ".tmp") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
 
             def fake_quiet(*args: str, cwd: Path | None = None):
@@ -454,7 +459,7 @@ class VerifyCasesSmokeTest(unittest.TestCase):
 
     def test_empty_patch_skips_verifier_and_says_no_agent_fix_yet(self) -> None:
         source = Path(__file__).resolve().parents[1] / "cases" / "cpp-peglib-121"
-        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[2] / ".tmp") as directory:
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             case_dir = root / "cases" / "cpp-peglib-121"
             case_dir.mkdir(parents=True)
