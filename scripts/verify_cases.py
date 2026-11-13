@@ -377,9 +377,11 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
     if reference_name is not None:
         bug_args.extend(("--command", f"GTEST_FILTER={reference_name} {case['test']}"))
     bug = quiet_stage("cplus bug baseline", "reference test did not reproduce", *bug_args)
+    verdict_words = sorted(set(re.findall(r"(REPRODUCED|NOT_VERIFIABLE|ERROR)", bug.stdout or "")))
+    print(f"{case_id}/{agent_id}: cplus bug exit={bug.returncode} words={verdict_words} "
+          f"{baseline_summary(spec) if spec.is_file() else 'no bug spec written'}", flush=True)
     if bug.returncode or "REPRODUCED" not in bug.stdout or not spec.is_file():
         raise CaseExecutionError("cplus bug baseline", "reference test did not reproduce")
-    print(f"{case_id}/{agent_id}: {baseline_summary(spec)}", flush=True)
     started = time.monotonic()
     verify_args = ["cplus", "verify", "--project", str(scratch), "--patch",
                    str(patch), "--bug-spec", str(spec),
