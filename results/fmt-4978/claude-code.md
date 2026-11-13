@@ -1,7 +1,24 @@
 # fmt-4978
 
-Verdict: **PENDING**
+Verdict: **INFRASTRUCTURE_ERROR**
 
-Status: no agent fix yet
+Reason: agent: could not save the patch
 
-Agent: Claude Code
+Elapsed: pending
+
+Verifier: cplus 81c0fda242fef1daf55d3164e06127d372c81caa · 2026-11-13 21:10:42 UTC (attempted; no code verdict)
+
+Patch: sha256 pending
+
+Agent: Claude Code · Version: 2.1.323 (Claude Code)
+
+| Check | Status |
+| --- | --- |
+| anti_cheat | SKIPPED |
+| build:baseline | SKIPPED |
+| repro:baseline | SKIPPED |
+| build:patched | SKIPPED |
+| repro:patched | SKIPPED |
+| repeat | SKIPPED |
+| revert | SKIPPED |
+| regression | SKIPPED |
