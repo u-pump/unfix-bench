@@ -53,7 +53,8 @@ case_file="$ROOT/cases/$CASE_ID/case.yaml"
 [ -f "$case_file" ] || fail "input: unknown case"
 upstream_repo=$("$PY" -c 'import json,sys;print(json.load(open(sys.argv[1]))["repo"])' "$case_file")
 patch_file="$ROOT/cases/$CASE_ID/agents/claude-code/agent-fix.patch"
-if [ -s "$patch_file" ]; then fail "input: first patch already recorded"; fi
+# A dry run records nothing, so it may use a case that already has its attempt.
+if [ -s "$patch_file" ] && [ -z "${DRY_RUN:-}" ]; then fail "input: first patch already recorded"; fi
 
 # 1. Fetch the frozen input (private) with a token that never reaches the agent.
 ASKPASS="$TMP/askpass-$CASE_ID"

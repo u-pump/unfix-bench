@@ -1,10 +1,35 @@
 {
   "name": "Claude Code",
-  "version": null,
-  "model": null,
-  "invocation": "claude -p",
-  "date_utc": null,
-  "environment": "Pending: attempt runs in GitHub Actions (see docs/run-claude-code.md)",
-  "patch_sha256": null,
-  "attempt_note": "Not run"
+  "version": "2.1.323 (Claude Code)",
+  "model": "claude-opus-5-5",
+  "requested_model": "claude-opus-5-5",
+  "effort": "default (not set)",
+  "date_utc": "2026-11-13T20:09:51Z",
+  "environment": "GitHub Actions ubuntu-latest; agent in a Docker container (read-only root, non-root uid, writable only /work and a tmpfs home, all capabilities dropped); container network is internal and egress goes through a proxy that allows only api.anthropic.com:443; --safe-mode, no web tools, no MCP, no memory or CLAUDE.md",
+  "invocation": "claude -p --output-format stream-json --verbose --no-session-persistence --safe-mode --strict-mcp-config --disable-slash-commands --permission-mode acceptEdits --permission-prompts none --tools Bash,Read,Edit,Write,Glob,Grep --allowedTools Bash,Read,Edit,Write,Glob,Grep --disallowedTools WebSearch,WebFetch --model claude-opus-5-5 (task text on stdin)",
+  "session_id": "c36fe169-63c5-43c3-94c0-8f453b174df5",
+  "patch_sha256": "d859792d6e479a6eaa35506001ed724268edde6a2135bcfc46098528c0cd0806",
+  "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "metrics": {
+    "bash_commands": 5,
+    "tool_calls": 5,
+    "turns": 6,
+    "duration_seconds": 79
+  },
+  "network_attempts": {
+    "count": 0,
+    "commands": []
+  },
+  "proxy_hosts": {
+    "allowed": [
+      "api.anthropic.com"
+    ],
+    "denied": [
+      "example.com",
+      "github.com"
+    ]
+  },
+  "run_url": "https://github.com/u-pump/unfix-bench/actions/runs/43498479996",
+  "image": "sha256:e3c1fa38620eb19137a64ac736ceb1f8d7ff88726f937d8708339f770d19969b",
+  "network_proof": "all isolation proofs passed before the run; log in the run artifact"
 }
