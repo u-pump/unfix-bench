@@ -289,7 +289,32 @@ def baseline_summary(spec_path: Path) -> str:
                           isinstance(run.get(key), str) and re.fullmatch(r"[A-Za-z_ -]{1,24}", run[key]))]
             per_run.append("{" + ",".join(fields) + "}")
         parts.append("runs=[" + " ".join(per_run) + "]")
+        parts.append("signatures=" + _signature_counts(runs))
+    for key in ("kind", "frequency", "timed_out_runs", "requested_runs", "run_timeout_s", "duration_s"):
+        value = data.get(key)
+        if isinstance(value, (int, float)) or (isinstance(value, str) and re.fullmatch(r"[a-z_]{1,24}", value)):
+            parts.append(f"{key}={value}")
     return "bug baseline: " + " ".join(parts)
+
+
+def _signature_counts(runs: list[object]) -> str:
+    """Which failures the runs had: kind, test name, file name, line (short, character-limited)."""
+    counts: dict[str, int] = {}
+    for run in runs:
+        signature = run.get("signature") if isinstance(run, dict) else None
+        if not isinstance(signature, dict):
+            label = "none"
+        else:
+            fields = []
+            for key in ("kind", "test_name", "file", "line", "function", "exit_status"):
+                value = signature.get(key)
+                if key == "file" and isinstance(value, str):
+                    value = value.replace(chr(92), "/").rsplit("/", 1)[-1]
+                if isinstance(value, int) or (isinstance(value, str) and re.fullmatch(r"[\w .:+<>~-]{1,60}", value)):
+                    fields.append(f"{key}={value}")
+            label = "(" + ",".join(fields) + ")"
+        counts[label] = counts.get(label, 0) + 1
+    return "[" + " ".join(f"{label}x{count}" for label, count in sorted(counts.items())) + "]"
 
 
 def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | None, str | None]:

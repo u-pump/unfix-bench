@@ -32,6 +32,17 @@ class BaselineSummaryTest(unittest.TestCase):
         for hidden in ("secret", "/home", "TEST OUTPUT", "passwd"):
             self.assertNotIn(hidden, text)
 
+    def test_signatures_are_counted_with_short_identifiers_only(self) -> None:
+        sig = {"kind": "assertion", "test_name": "multithread flush", "file": "/home/runner/work/x/test_async.cpp",
+               "line": 35, "message": "FULL OUTPUT TEXT", "error_lines": ["more text"]}
+        text = self.summary({"completed_runs": 3, "failures": 1,
+                             "runs": [{"exit_code": 8, "signature": sig}, {"exit_code": 8, "signature": sig},
+                                      {"exit_code": 0}]})
+        self.assertIn("(kind=assertion,test_name=multithread flush,file=test_async.cpp,line=35)x2", text)
+        self.assertIn("nonex1", text)
+        self.assertNotIn("FULL OUTPUT", text)
+        self.assertNotIn("/home", text)
+
     def test_unreadable_file(self) -> None:
         self.assertEqual(verify_cases.baseline_summary(Path("missing.json")), "bug baseline: not readable")
 
