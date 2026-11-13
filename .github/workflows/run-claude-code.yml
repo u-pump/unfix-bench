@@ -185,6 +185,14 @@ jobs:
               --reason "agent: no result was produced; see the run log" \
               --results-dir "$RUNNER_TEMP/final/results"
           fi
+      - name: Make ThreadSanitizer usable on the runner
+        # The runner kernel randomises memory mappings over a wider range than ThreadSanitizer
+        # supports ("FATAL: ThreadSanitizer: unexpected memory mapping"); cases built with TSan
+        # then fail before running any test. The local machine does not have this limit.
+        run: |
+          sysctl vm.mmap_rnd_bits
+          sudo sysctl -w vm.mmap_rnd_bits=28
+          sysctl vm.mmap_rnd_bits
       - name: Install private verifier
         if: steps.place.outputs.has_patch == 'true'
         env:
