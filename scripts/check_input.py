@@ -25,7 +25,7 @@ EXTRA_FILES = {"ISSUE.md", "TASK.md"}
 
 def git(repo: Path, *args: str) -> bytes:
     result = subprocess.run(
-        ["git", "-c", "core.autocrlf=false", "-C", str(repo), *args],
+        ["git", "-c", "core.autocrlf=false", "-c", "core.eol=lf", "-C", str(repo), *args],
         capture_output=True,
         check=False,
     )
@@ -49,15 +49,17 @@ def archive_entries(archive: bytes) -> dict[str, str]:
 
 
 def input_entries(input_dir: Path) -> dict[str, str]:
-    """Digest every tracked file of the input repository the same way."""
+    """Digest every tracked file from the git objects, so no checkout filter can matter."""
     entries: dict[str, str] = {}
-    names = git(input_dir, "ls-files", "-z").decode("utf-8").split("\0")
-    for name in filter(None, names):
-        path = input_dir / name
-        if path.is_symlink():
-            entries[name] = "symlink:" + str(path.readlink())
+    listing = git(input_dir, "ls-files", "-s", "-z").decode("utf-8").split(chr(0))
+    for row in filter(None, listing):
+        meta, name = row.split(chr(9), 1)
+        mode, blob = meta.split()[0], meta.split()[1]
+        content = git(input_dir, "cat-file", "blob", blob)
+        if mode == "120000":
+            entries[name] = "symlink:" + content.decode("utf-8")
         else:
-            entries[name] = hashlib.sha256(path.read_bytes()).hexdigest()
+            entries[name] = hashlib.sha256(content).hexdigest()
     return entries
 
 
@@ -73,16 +75,18 @@ def check(case: dict[str, object], input_dir: Path, upstream_dir: Path) -> list[
             problems.append("input checkout is not clean")
     except RuntimeError:
         return ["input is not a readable git repository"]
-    issue, task = input_dir / "ISSUE.md", input_dir / "TASK.md"
-    if not issue.is_file() or not task.is_file():
+    try:
+        issue = git(input_dir, "cat-file", "blob", "HEAD:ISSUE.md")
+        task = git(input_dir, "cat-file", "blob", "HEAD:TASK.md")
+    except RuntimeError:
         return [*problems, "ISSUE.md or TASK.md is missing"]
-    if task.read_text(encoding="utf-8").strip() != TASK_TEXT:
+    if task.decode("utf-8").strip() != TASK_TEXT:
         problems.append("TASK.md differs from the benchmark protocol")
     try:
         archive = git(upstream_dir, "archive", "--format=tar", str(case["base"]))
     except RuntimeError:
         return [*problems, "upstream base commit is unavailable"]
-    digest = hashlib.sha256(archive + issue.read_bytes() + task.read_bytes()).hexdigest()
+    digest = hashlib.sha256(archive + issue + task).hexdigest()
     if digest != case["input_sha256"]:
         problems.append("input_sha256 does not match the recomputed value")
     expected = archive_entries(archive)
