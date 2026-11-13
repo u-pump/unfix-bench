@@ -81,7 +81,7 @@ class NetworkAttemptsTest(unittest.TestCase):
 
 class SecretScanTest(unittest.TestCase):
     def test_token_and_token_shaped_strings_are_found_without_printing_them(self) -> None:
-        token = "sk-ant-oat01-" + "a" * 40
+        token = "sk-ant-api03-" + "a" * 40
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             clean = root / "clean.txt"

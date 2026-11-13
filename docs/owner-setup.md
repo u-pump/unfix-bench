@@ -11,23 +11,23 @@ The read-only token is used only in the install step. The separate publish job r
 
 ## Claude Code runs (BENCH-13)
 
-The [Claude Code workflow](run-claude-code.md) needs three more repository secrets and two settings. None of them is ever written to a file, an issue, a commit or a workflow input.
+The [Claude Code workflow](run-claude-code.md) authenticates with an Anthropic API key from a **dedicated Console workspace that has a spend limit**. The key is deleted after the ten runs. Nothing below is ever written to a file, an issue, a commit or a workflow input. Console paths are quoted from Anthropic's documentation ([workspaces](https://platform.claude.com/docs/en/build-with-claude/workspaces), [API key management](https://platform.claude.com/docs/en/manage-claude/authentication)); where the documentation gives no path, this page says so.
 
-1. **`CLAUDE_CODE_OAUTH_TOKEN`.** On a machine where you are logged in to the Claude subscription, run `claude setup-token`, copy the token it prints, and add it under **Settings** → **Secrets and variables** → **Actions** → **Secrets** → **New repository secret**. The token is valid for one year and can only make model requests.
-2. **`BENCH_INPUT_TOKEN`.** A fine-grained personal access token: **Resource owner** `u-pump`, **Repository access** → **Only select repositories**, select exactly these ten repositories, **Repository permissions** → **Contents: Read-only**, nothing else, short expiry:
-   `bench-in-cpp-peglib-121`, `bench-in-fmt-4490`, `bench-in-fmt-4742`, `bench-in-fmt-4800`, `bench-in-fmt-4933`, `bench-in-fmt-4942`, `bench-in-fmt-4960`, `bench-in-fmt-4978`, `bench-in-spdlog-3049`, `bench-in-zlibng-2465`.
-3. **`CPLUS_READ_TOKEN`** already exists (see above) and is reused for the verdict.
-4. **Pull requests from Actions.** **Settings** → **Actions** → **General** → **Workflow permissions** → tick **Allow GitHub Actions to create and approve pull requests**, then **Save**. The record job opens its pull request with the built-in `GITHUB_TOKEN`; GitHub does not start other workflows for such a pull request, so run the checks by hand if you want them on it.
-5. If **Settings** → **Actions** → **General** restricts allowed actions, also permit `actions/checkout`, `actions/setup-python`, `actions/upload-artifact` and `actions/download-artifact` (already required by the verify workflow).
+1. **Create the workspace.** In the Claude Console open **Workspaces** (`platform.claude.com/settings/workspaces`) and click **Create workspace**; enter a name (for example `unfix-bench`), choose a color, and click **Create workspace** again. Only organization admins can create workspaces. The Default Workspace cannot have a spend limit, so do not use it.
+2. **Set the spend limit.** On the **Workspaces** page select the new workspace, and in the panel that opens click **Spend limits** to cap monthly spending and configure alerts. Choose a cap you are willing to lose; the key cannot spend more than this in the workspace. The documentation does not state what a run costs.
+3. **Create the key.** Open **API keys** (`platform.claude.com/settings/keys`) and click **Create key**. Name it (for example `unfix-bench-claude-code`), choose an expiration (the presets are 3 hours, 1 day, 7 days and 30 days, or a custom duration; pick one that ends after the last run), and scope the key to the `unfix-bench` workspace. The documentation says a key can be scoped to a specific workspace but does not name the control; do not use an unscoped key, and if the form offers no way to scope it, ask Anthropic support before continuing. Copy the key once.
+4. **Add the repository secret `ANTHROPIC_API_KEY`:** **Settings** → **Secrets and variables** → **Actions** → **Secrets** → **New repository secret**, paste the key. Never paste it anywhere else.
+5. **`BENCH_INPUT_TOKEN`** (already added): a fine-grained personal access token, **Resource owner** `u-pump`, **Only select repositories**: exactly `bench-in-cpp-peglib-121`, `bench-in-fmt-4490`, `bench-in-fmt-4742`, `bench-in-fmt-4800`, `bench-in-fmt-4933`, `bench-in-fmt-4942`, `bench-in-fmt-4960`, `bench-in-fmt-4978`, `bench-in-spdlog-3049`, `bench-in-zlibng-2465`; **Contents: Read-only**; short expiry.
+6. **`CPLUS_READ_TOKEN`** already exists (see above) and is reused for the verdict.
+7. **Pull requests from Actions.** **Settings** → **Actions** → **General** → **Workflow permissions** → tick **Allow GitHub Actions to create and approve pull requests**, then **Save**. The record job opens its pull request with the built-in `GITHUB_TOKEN`; GitHub does not start other workflows for such a pull request, so run the checks by hand if you want them on it.
+8. If **Settings** → **Actions** → **General** restricts allowed actions, also permit `actions/checkout`, `actions/setup-python`, `actions/upload-artifact` and `actions/download-artifact`.
 
-**After all ten runs: retire the Claude token on the same day.** Delete the `CLAUDE_CODE_OAUTH_TOKEN` and `BENCH_INPUT_TOKEN` secrets, and delete the token file or shell variable wherever you pasted it. Then read the next paragraph: deleting the secret does not make the token invalid.
+**After the ten runs, on the same day:**
+1. On **API keys** (`platform.claude.com/settings/keys`) click **Delete** on the key. The documentation says **Disable** is reversible and **Delete** is permanent; it does not say how fast either takes effect.
+2. Delete the `ANTHROPIC_API_KEY` and `BENCH_INPUT_TOKEN` repository secrets. Deleting a secret does not make the credential invalid ("If you delete a secret, the credential it held stays valid"), which is why the key itself is deleted in step 1.
+3. Check that the key is gone: it appears on the **API keys** page with the status archived (the documentation describes deleted keys as archived).
+4. Optionally archive the workspace: the documentation says archiving "deactivates the workspace and archives every API key created for it" and cannot be undone.
 
-**There is no documented way to revoke a `claude setup-token` token.** Anthropic's documentation says only that `claude setup-token` generates "a one-year OAuth token" that "can only make model requests" and is not saved anywhere ([authentication](https://code.claude.com/docs/en/authentication)); that "If you delete a secret, the credential it held stays valid" ([GitHub Actions](https://code.claude.com/docs/en/github-actions)); and that the token "is tied to the subscription of the person who ran `claude setup-token`". The documentation gives no page in claude.ai or the Console that lists or revokes such a token, and it does not say that `claude auth logout` or `/logout` revokes it. The exact interface path is therefore not stated here, because it is not documented. Choices that are open to you:
-- ask Anthropic support (https://support.claude.com) how to revoke a `setup-token` token and keep the answer with the run records;
-- run the benchmark from a Claude account (or a subscription) used only for it, so that an unrevoked token can reach nothing else, and stop the subscription afterwards;
-- otherwise treat the token as live until it expires one year after the date printed by `claude setup-token`, and note that date.
-The token can make model requests on that subscription, nothing else.
-
-If a run ever reports `SECRET FOUND`, retire the token the same way at once, whatever else happened.
+If a run ever reports `SECRET FOUND`, delete the key at once, whatever else happened.
 
 Artifacts of this repository are downloadable by anyone who can see it, so a run uploads only files that passed the secret scan and keeps them seven days.

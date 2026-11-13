@@ -143,7 +143,7 @@ cmd_proof() {
         # Start Claude Code with a deliberately fake token. It must get as far as asking the
         # API (through the proxy) and be refused there; the proxy log then shows every host it
         # tried to reach. A start-up failure of any other kind fails the proof.
-        out=$(printf 'hello' | in_agent_net -i -e CLAUDE_CODE_OAUTH_TOKEN=probe-not-a-real-token-0000000000 \
+        out=$(printf 'hello' | in_agent_net -i -e ANTHROPIC_API_KEY=probe-not-a-real-key-0000000000 \
             "$AGENT_IMAGE" timeout 120 claude -p --no-session-persistence --safe-mode \
             --strict-mcp-config --disable-slash-commands --permission-mode acceptEdits \
             --permission-prompts none --tools Bash,Read,Edit,Write,Glob,Grep \
@@ -153,7 +153,7 @@ cmd_proof() {
         case "$out" in
             *"could not start"*|*"unknown option"*|*"invalid"*"choice"*|*"did you mean"*|*bubblewrap*)
                 printf 'FAIL  %-58s\n' "Claude Code starts with the invocation flags"; PROOF_FAILED=1 ;;
-            *) printf 'OK    %-58s\n' "Claude Code starts with the invocation flags (fake token: API refusal expected)" ;;
+            *) printf 'OK    %-58s\n' "Claude Code starts with the invocation flags (fake key: API refusal expected)" ;;
         esac
         if [ "$PROOF_FAILED" -eq 0 ]; then echo "RESULT: all proofs passed"; else echo "RESULT: PROOF FAILED"; fi
     } 2>&1 | tee "$log"
@@ -166,7 +166,7 @@ cmd_agent() {
     load_state
     local work=$1 task=$2 transcript=$3 stderr_log=$4 model=$5
     docker run --rm -i --name "bench-agent-${RUN_ID}" "${hardening[@]}" --network "$INTERNAL_NET" \
-        "${proxy_env[@]}" -e CLAUDE_CODE_OAUTH_TOKEN -v "$work":/work:rw -w /work "$AGENT_IMAGE" \
+        "${proxy_env[@]}" -e ANTHROPIC_API_KEY -v "$work":/work:rw -w /work "$AGENT_IMAGE" \
         timeout -k 30 3600 claude -p --output-format stream-json --verbose --no-session-persistence \
         --safe-mode --strict-mcp-config --disable-slash-commands --permission-mode acceptEdits \
         --permission-prompts none --tools Bash,Read,Edit,Write,Glob,Grep \

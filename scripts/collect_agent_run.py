@@ -3,7 +3,7 @@
 """Turn one Claude Code run into recorded evidence, or into a public ERROR report.
 
 Everything that leaves the CI job passes through ``scan`` first: a file that
-contains the OAuth token (or anything shaped like an Anthropic token) is deleted
+contains the API key (or anything shaped like an Anthropic key) is deleted
 and the run fails closed.
 """
 
@@ -23,7 +23,7 @@ import verify_cases
 
 AGENT_ID = "claude-code"
 AGENT_NAME = "Claude Code"
-TOKEN_ENV = "CLAUDE_CODE_OAUTH_TOKEN"
+TOKEN_ENV = "ANTHROPIC_API_KEY"
 TOKEN_SHAPE = re.compile(r"sk-ant-[A-Za-z0-9_-]{20,}")
 DENIED_HOST = re.compile(r'refused on filtered domain "([^"]+)"')
 ALLOWED_HOST = re.compile(r'Established connection to host "([^"]+)"')

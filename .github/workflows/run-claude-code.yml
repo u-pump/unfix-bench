@@ -116,7 +116,7 @@ jobs:
       - name: Run one attempt
         env:
           BENCH_INPUT_TOKEN: ${{ secrets.BENCH_INPUT_TOKEN }}
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           CASE_ID: ${{ matrix.case }}
         run: bash scripts/run_claude_case.sh "$CASE_ID" "$RUNNER_TEMP/out"
@@ -124,7 +124,7 @@ jobs:
         id: scan
         if: always()
         env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           find "$RUNNER_TEMP/out" -type f -print0 | xargs -0 python scripts/collect_agent_run.py scan
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

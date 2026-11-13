@@ -28,7 +28,7 @@ Both agents get the same frozen input, the same `TASK.md`, one attempt, the firs
 | Isolation of files | Codex `workspace-write` sandbox | Read-only container root, non-root user, no capabilities, writable only the case directory and a temporary home |
 | Tools | Codex defaults | Bash, Read, Edit, Write, Glob, Grep; no web tools, MCP, memory, `CLAUDE.md`, plugins or hooks |
 | Model | `gpt-6-sol`, reasoning `medium` | `claude-opus-5-5`, effort left at the default; the exact name and the Claude Code version are recorded in `agent.yaml` |
-| Authentication | Local login | Subscription OAuth token as a repository secret |
+| Authentication | Local login | `ANTHROPIC_API_KEY` of a dedicated Console workspace with a spend limit, as a repository secret; deleted after the runs |
 | Input check | Single root commit and exact `TASK.md` | Single root commit, exact `TASK.md`, `input_sha256` recomputed from the upstream base, and a file-by-file comparison |
 | Patch capture | `git add -A` excluding `build*/`, `git diff --cached --binary` | The same commands, run in a separate container without network |
 | Verdict | Unfix verifier, pinned revision | The same |
