@@ -75,6 +75,17 @@ class RunnerInvocationTest(unittest.TestCase):
         self.assertLess(RUN_SCRIPT.index('proof "$OUT/evidence/network-proof.log"'),
                         RUN_SCRIPT.index('"${SANDBOX[@]}" agent'))
 
+    def test_only_a_dry_run_may_use_a_case_that_already_has_its_attempt(self) -> None:
+        # Regression: the PR probe dry-run used fmt-4800, which became recorded on main.
+        line = next(row for row in RUN_SCRIPT.splitlines() if "first patch already recorded" in row)
+        self.assertIn('[ -s "$patch_file" ]', line)
+        self.assertIn('[ -z "${DRY_RUN:-}" ]', line)
+
+    def test_probe_runs_when_the_attempt_script_or_collector_changes(self) -> None:
+        trigger = WORKFLOW[WORKFLOW.index("pull_request:"): WORKFLOW.index("permissions:")]
+        for path in ("scripts/run_claude_case.sh", "scripts/collect_agent_run.py", "scripts/agent_sandbox.sh"):
+            self.assertIn(f"'{path}'", trigger)
+
 
 if __name__ == "__main__":
     unittest.main()

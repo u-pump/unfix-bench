@@ -24,6 +24,8 @@ on:
       - 'scripts/agent_sandbox.sh'
       - 'scripts/probe_inputs.sh'
       - 'scripts/check_input.py'
+      - 'scripts/run_claude_case.sh'
+      - 'scripts/collect_agent_run.py'
       - '.github/workflows/run-claude-code.yml'
 
 permissions:
