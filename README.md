@@ -29,7 +29,8 @@ Claude Code is the second agent; its runs are pending in an OS-sandboxed environ
 - A snapshot of the broken commit, with no later upstream history or fix.
 - `ISSUE.md`: the original issue text with solution-revealing passages removed.
 - The same `TASK.md` for every case: “Fix the bug described in ISSUE.md. Keep the change minimal. Run the existing tests.”
-- One attempt without network access; the first patch was saved byte-for-byte, without human edits.
+- One attempt per agent; the first patch was saved byte-for-byte, without human edits.
+- Network: Codex CLI ran locally on Windows under its own sandbox setting (`--sandbox workspace-write` in 8 of 10 cases; the invocation recorded for cpp-peglib-121 and fmt-4800 names no sandbox flag). Whether it could reach the network was not independently verified. Claude Code runs in a container whose only reachable host is `api.anthropic.com`, proven in each run's log. The [conditions of both agents](docs/protocol.md#conditions-codex-cli-and-claude-code) are compared in the protocol.
 - `input_sha256` in each `case.yaml` identifies the frozen source archive, `ISSUE.md`, and `TASK.md` input.
 
 ## How a verdict is decided
