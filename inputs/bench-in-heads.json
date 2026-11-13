@@ -1,0 +1,45 @@
+{
+  "note": "HEAD commit of each private u-pump/bench-in-<id> repository, the agent input Codex CLI received. No repository was pushed after the date of its Codex run; for cpp-peglib-121, fmt-4800 and spdlog-3049 the push and the run are on the same day, so their order cannot be shown. See docs/DECISIONS.md, BENCH-13.",
+  "inputs": {
+    "cpp-peglib-121": {
+      "commit": "fcaa1b0f50df505fd412803ad171822c04df9853",
+      "tree": "2033e17e0abe3f04cad2f8060531b4d415894e7e"
+    },
+    "fmt-4490": {
+      "commit": "068ef94730dbd2aa04bf80aec3721dc1e7437ebe",
+      "tree": "91019f2012ac278c9d6b5dadb331c3e2f366f9bf"
+    },
+    "fmt-4742": {
+      "commit": "a0f5f0a1ec31ccf9fc02cf0f653f454737704374",
+      "tree": "5273a98ea980bb3892d5452c104249f2e775eaf3"
+    },
+    "fmt-4800": {
+      "commit": "3c701f61457f8364b3e565339ea9bc38fb51bce5",
+      "tree": "99019b85d690847de46e8957e98d47cbfcbc1788"
+    },
+    "fmt-4933": {
+      "commit": "890093d2b29b9b37e31eb04f34cca93242adedd9",
+      "tree": "0ed76fd58288b76dcb1ecdad4c465d47ab86d579"
+    },
+    "fmt-4942": {
+      "commit": "ff3fdbf657d95492b77ea8f815cdfefea4c3ea15",
+      "tree": "1ff25fe38eca604854fd0ef9d20c12dc2b0e4bc4"
+    },
+    "fmt-4960": {
+      "commit": "cf999350a23b0567c1c687df705736aec2c61c9e",
+      "tree": "89277d64640c903d857d1bca3cf515f95c8c286a"
+    },
+    "fmt-4978": {
+      "commit": "d0d95efa4b3ecd343f956bc61091e0b87e4cf2b2",
+      "tree": "2e280f9883cab67e136ed94210c6d804d155973f"
+    },
+    "spdlog-3049": {
+      "commit": "e475d9348490eb5c2078e1d4abb9b0700cd4e5df",
+      "tree": "2e856e9b36c8d623fe1ede1c8309a3a468d1ee10"
+    },
+    "zlibng-2465": {
+      "commit": "3c40bdc518d6a9104a98f5fc0dfbd3e9de598ada",
+      "tree": "b9989957c0bf6207c7aafc346a0a847abb5ddc1f"
+    }
+  }
+}

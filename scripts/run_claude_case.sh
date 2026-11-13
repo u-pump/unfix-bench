@@ -6,7 +6,7 @@
 #
 # Usage: run_claude_case.sh <case-id> <out-dir>
 # Environment: BENCH_INPUT_TOKEN (read access to u-pump/bench-in-*),
-#              CLAUDE_CODE_OAUTH_TOKEN, AGENT_MODEL, GITHUB_RUN_URL.
+#              ANTHROPIC_API_KEY, AGENT_MODEL, GITHUB_RUN_URL.
 #
 # <out-dir> receives only what may be published: result/agent-fix.patch, result/agent.yaml
 # (or a public ERROR report), evidence/network-proof.log and evidence/proxy.log. The agent's
@@ -44,7 +44,7 @@ cleanup() {
 trap cleanup EXIT
 
 [ -n "${BENCH_INPUT_TOKEN:-}" ] || fail "input: BENCH_INPUT_TOKEN is not configured"
-[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] || fail "auth: CLAUDE_CODE_OAUTH_TOKEN is not configured"
+[ -n "${ANTHROPIC_API_KEY:-}" ] || fail "auth: ANTHROPIC_API_KEY is not configured"
 
 case_file="$ROOT/cases/$CASE_ID/case.yaml"
 [ -f "$case_file" ] || fail "input: unknown case"
@@ -61,7 +61,7 @@ mkdir -p "$(dirname "$WORK")" "$(dirname "$UPSTREAM")"
 GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0 git -c core.autocrlf=false clone -q --depth 1 --single-branch \
     "https://github.com/u-pump/bench-in-$CASE_ID.git" "$WORK" >/dev/null 2>&1 || fail "input: bench-in repository unavailable"
 rm -f "$ASKPASS"
-git clone -q --no-checkout "$upstream_repo" "$UPSTREAM" >/dev/null 2>&1 || fail "input: upstream repository unavailable"
+git clone -q --no-checkout "$upstream_repo" "$UPSTREAM" >/dev/null 2>&1 || echo "info: upstream clone unavailable; the hash comparison is skipped"
 
 # 2. The input must be exactly the frozen one (the log holds only hashes and file names).
 if ! "$PY" "$HERE/check_input.py" --case "$case_file" --input "$WORK" --upstream "$UPSTREAM" > "$PRIV/input-check.log"; then

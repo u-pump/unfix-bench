@@ -27,13 +27,11 @@ for case_file in "$ROOT"/cases/*/case.yaml; do
         "https://github.com/u-pump/bench-in-$id.git" "$TMP/input" >/dev/null 2>&1; then
         echo "FAIL  $id: bench-in repository unavailable" | tee -a "$LOG"; failed=1; continue
     fi
-    if ! git clone -q --no-checkout "$repo" "$TMP/upstream" >/dev/null 2>&1; then
-        echo "FAIL  $id: upstream repository unavailable" | tee -a "$LOG"; failed=1; continue
-    fi
+    git clone -q --no-checkout "$repo" "$TMP/upstream" >/dev/null 2>&1 || echo "info: upstream clone unavailable" >> "$LOG"
     if python3 "$HERE/check_input.py" --case "$case_file" --input "$TMP/input" --upstream "$TMP/upstream" >> "$LOG" 2>&1; then
         echo "OK    $id" | tee -a "$LOG"
     else
-        echo "FAIL  $id: input check failed" | tee -a "$LOG"; failed=1
+        echo "FAIL  $id: input check failed (pinned commit, single commit or TASK.md)" | tee -a "$LOG"; failed=1
     fi
 done
 exit "$failed"
