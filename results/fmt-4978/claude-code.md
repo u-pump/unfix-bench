@@ -4,6 +4,8 @@ Verdict: **VERIFIED**
 
 Reason: judged by upstream reference test 'chrono_test.year_month_day_weekday_and_day_of_year'; fix proven
 
+Attempt: The first attempt was lost because of a bench error (run 43504157177: the patch could not be saved, fixed in PR 22); no verdict for it was ever known. This is the one allowed rerun.
+
 Elapsed: 25.8 s
 
 Verifier: cplus 81c0fda242fef1daf55d3164e06127d372c81caa · 2026-11-13 23:26:00 UTC

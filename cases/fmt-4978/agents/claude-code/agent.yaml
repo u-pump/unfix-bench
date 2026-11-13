@@ -9,7 +9,7 @@
   "invocation": "claude -p --output-format stream-json --verbose --no-session-persistence --safe-mode --strict-mcp-config --disable-slash-commands --permission-mode acceptEdits --permission-prompts none --tools Bash,Read,Edit,Write,Glob,Grep --allowedTools Bash,Read,Edit,Write,Glob,Grep --disallowedTools WebSearch,WebFetch --model claude-opus-5-5 (task text on stdin)",
   "session_id": "e7a0ba6f-c67a-42c5-a301-4f89db8b5438",
   "patch_sha256": "31a9c86cac793c84e8be2cf1b60e5e5bbb784d62616e7487595c6bc6563ebfad",
-  "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "attempt_note": "The first attempt was lost because of a bench error (run 43504157177: the patch could not be saved, fixed in PR 22); no verdict for it was ever known. This is the one allowed rerun.",
   "metrics": {
     "bash_commands": 7,
     "tool_calls": 9,
