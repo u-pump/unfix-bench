@@ -26,9 +26,12 @@ RUN curl -fsSL -o /tmp/node.tar.xz \
     && claude --version
 
 # The container runs as the runner's uid with a tmpfs home; no account is needed.
+# CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 needs bubblewrap, which needs user namespaces and a
+# weaker container profile, so it is off; the token is protected by the secret scan instead
+# (see docs/DECISIONS.md, BENCH-13).
 ENV HOME=/home/agent \
     DISABLE_AUTOUPDATER=1 \
     DISABLE_TELEMETRY=1 \
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
-    CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1
+    CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=0
 WORKDIR /work

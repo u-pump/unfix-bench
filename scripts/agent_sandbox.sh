@@ -140,16 +140,20 @@ cmd_proof() {
             *wrote-work*) printf 'OK    %-58s\n' "the work directory is writable" ;;
             *) printf 'FAIL  %-58s %s\n' "the work directory is writable" "${out:0:200}"; PROOF_FAILED=1 ;;
         esac
-        out=$(printf 'hello' | in_agent_net -i "$AGENT_IMAGE" claude -p --no-session-persistence --safe-mode \
+        # Start Claude Code with a deliberately fake token. It must get as far as asking the
+        # API (through the proxy) and be refused there; the proxy log then shows every host it
+        # tried to reach. A start-up failure of any other kind fails the proof.
+        out=$(printf 'hello' | in_agent_net -i -e CLAUDE_CODE_OAUTH_TOKEN=probe-not-a-real-token-0000000000 \
+            "$AGENT_IMAGE" timeout 120 claude -p --no-session-persistence --safe-mode \
             --strict-mcp-config --disable-slash-commands --permission-mode acceptEdits \
             --permission-prompts none --tools Bash,Read,Edit,Write,Glob,Grep \
             --allowedTools Bash,Read,Edit,Write,Glob,Grep --disallowedTools WebSearch,WebFetch \
             --output-format stream-json --verbose --model claude-opus-5-5 2>&1)
+        printf '      claude printed: %s\n' "$(printf '%s' "${out:0:400}" | tr '\n' ' ')"
         case "$out" in
-            *"unknown option"*|*"invalid"*"choice"*|*"did you mean"*)
-                printf 'FAIL  %-58s %s\n' "Claude Code accepts the invocation flags" "${out:0:300}"; PROOF_FAILED=1 ;;
-            *) printf 'OK    %-58s\n' "Claude Code accepts the invocation flags (no login: expected failure)"
-               printf '      claude printed: %s\n' "$(printf '%s' "${out:0:240}" | tr '\n' ' ')" ;;
+            *"could not start"*|*"unknown option"*|*"invalid"*"choice"*|*"did you mean"*|*bubblewrap*)
+                printf 'FAIL  %-58s\n' "Claude Code starts with the invocation flags"; PROOF_FAILED=1 ;;
+            *) printf 'OK    %-58s\n' "Claude Code starts with the invocation flags (fake token: API refusal expected)" ;;
         esac
         if [ "$PROOF_FAILED" -eq 0 ]; then echo "RESULT: all proofs passed"; else echo "RESULT: PROOF FAILED"; fi
     } 2>&1 | tee "$log"
