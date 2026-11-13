@@ -86,9 +86,16 @@ jobs:
       - name: Remove the sandbox
         if: always()
         run: bash scripts/agent_sandbox.sh down
+      - name: Dry run of the attempt script (input, sandbox, proof; no agent, no API call)
+        env:
+          BENCH_INPUT_TOKEN: ${{ secrets.BENCH_INPUT_TOKEN }}
+          DRY_RUN: '1'
+        run: |
+          if [ -z "$BENCH_INPUT_TOKEN" ]; then echo "SKIPPED: BENCH_INPUT_TOKEN is not configured"; exit 0; fi
+          bash scripts/run_claude_case.sh fmt-4800 "$RUNNER_TEMP/probe/dry-run"
       - name: Scan before upload
         if: always()
-        run: python scripts/collect_agent_run.py scan "$RUNNER_TEMP"/probe/*
+        run: find "$RUNNER_TEMP/probe" -type f -print0 | xargs -0 python scripts/collect_agent_run.py scan
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -241,7 +248,7 @@ jobs:
             commit -qm "Record Claude Code attempt(s) from run ${GITHUB_RUN_ID}"
           git push -q origin "HEAD:refs/heads/${branch}"
           {
-            echo "Results of the [Claude Code run](${RUN_URL}); the log of each case shows the network isolation proof before the agent started."
+            echo "Results of the [Claude Code run](${RUN_URL}). A case with a recorded attempt has its network isolation proof in the run artifacts. A case that shows ERROR did not complete an attempt: no patch is recorded and the case stays open."
             echo
             echo "Review the patches, metadata and verdicts before merging. Nothing is published until this pull request is merged."
           } > "$RUNNER_TEMP/body.md"
