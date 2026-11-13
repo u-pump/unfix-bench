@@ -1,0 +1,1 @@
+bench-in-spdlog-3049 differs from the upstream base in 5 non-test files (.gitignore, INSTALL, LICENSE, README.md, cmake/spdlogConfig.cmake.in): CRLF line endings became LF. The executable bit of files is not preserved in the bench-in repositories (all cases). Both agents receive the same input; the patch is verified against the upstream base.

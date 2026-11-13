@@ -8,9 +8,11 @@ on:
       - 'cases/**'
       - 'results/**'
       - 'scripts/**'
+      - 'docker/**'
       - 'docs/**'
       - 'README.md'
       - '.github/workflows/verify.yml'
+      - '.github/workflows/run-claude-code.yml'
   push:
     branches:
       - main
@@ -45,14 +47,16 @@ jobs:
       - name: Test verifier and local runner
         run: |
           mkdir -p ../.tmp
-          PYTHONPATH=scripts python -m unittest test_verify_cases
+          PYTHONPATH=scripts python -m unittest discover -s scripts -p 'test_*.py'
+          python scripts/render_readme.py --check
+          for script in scripts/*.sh; do bash -n "$script"; done
           pwsh -NoProfile -File scripts/test_run_agent_local.ps1
       - name: Lint workflow
         run: |
           curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
           echo '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  '"$RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
-          "$RUNNER_TEMP/actionlint" .github/workflows/verify.yml
+          "$RUNNER_TEMP/actionlint" .github/workflows/verify.yml .github/workflows/run-claude-code.yml
 
   verify:
     if: github.event_name != 'pull_request' && github.actor == 'u-pump'
