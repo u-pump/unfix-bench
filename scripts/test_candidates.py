@@ -247,6 +247,20 @@ class CiAndDocsTest(unittest.TestCase):
             self.assertIn("noisy_module", text, name)
             self.assertIn("build_network" if name == "protocol.md" else "needs_network_dependency", text, name)
 
+    def test_readme_licence_table_covers_candidates(self) -> None:
+        rows = [r for r in (self.ROOT / "README.md").read_text(encoding="utf-8").splitlines() if "candidates/**" in r]
+        self.assertEqual(len(rows), 2, rows)
+        data, upstream = rows
+        self.assertIn("CC-BY-4.0.txt", data)
+        self.assertIn("THIRD_PARTY_NOTICES.md", upstream)
+        self.assertIn("diffs", upstream)
+
+    def test_the_move_checklist_requires_updating_third_party_notices(self) -> None:
+        text = (self.ROOT / "candidates" / "README.md").read_text(encoding="utf-8")
+        checklist = text[text.index("## Checklist"):]
+        self.assertIn("Update `THIRD_PARTY_NOTICES.md`", checklist)
+        self.assertIn("THIRD_PARTY_NOTICES.md", (self.ROOT / "docs" / "protocol.md").read_text(encoding="utf-8"))
+
     def test_every_documented_reason_code_is_in_the_vocabulary(self) -> None:
         text = (self.ROOT / "docs" / "plans" / "bench-20-miner.md").read_text(encoding="utf-8")
         line = next(row for row in text.splitlines() if row.startswith("Запись журнала"))

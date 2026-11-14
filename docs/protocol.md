@@ -53,4 +53,6 @@ A candidate is accepted only if all of these hold, and every other candidate is 
 
 **Granularity of the reference test** (`bug_test_granularity` in `case.yaml`: `function` or `ctest_module`). If the project has a function-level filter (for example `unity_fixture -n/-g`), the filter is used and the granularity is `function`. Only when there is no such filter may the whole ctest test of a module be the reference (`ctest_module`), and then **all** of these must hold: on the base only the tests added or changed by the upstream diff fail in that module; every other test in the module passes 3/3 (`module_other_tests: "3/3 pass"`); otherwise the candidate is rejected with the code `noisy_module`. The granularity is stated in the case report and the README. This rule applies to cases added from BENCH-20 on; the ten existing cases are not changed and carry no such field.
 
+Moving a draft to `cases/` follows the checklist in [candidates/README.md](../candidates/README.md), which includes updating `THIRD_PARTY_NOTICES.md`.
+
 The shape of `candidates/` is checked by `python scripts/candidates.py check` (also run in CI); it also checks that every published `case.yaml` has the shared fields.

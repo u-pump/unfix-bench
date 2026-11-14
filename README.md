@@ -100,6 +100,8 @@ The focused command above runs the selected `bug_test`; the CTest command runs t
 | Code in `scripts/` and `.github/workflows/` | [MIT](LICENSES/MIT.txt) |
 | Benchmark data and documentation in `cases/**/case.yaml`, `cases/**/agents/**/agent.yaml`, `results/`, `README.md`, `docs/`, and `CITATION.cff` | [Creative Commons Attribution 4.0 International (CC BY 4.0)](LICENSES/CC-BY-4.0.txt) |
 | Agent patches in `cases/**/agents/**/agent-fix.patch` and reproduced upstream code | The [respective upstream project's license](THIRD_PARTY_NOTICES.md) |
+| Candidate drafts in `candidates/**` (not yet published cases): benchmark data such as `case.yaml`, `meta.yaml`, the rejection logs and `baseline.log` | [Creative Commons Attribution 4.0 International (CC BY 4.0)](LICENSES/CC-BY-4.0.txt) |
+| Upstream code, diffs and the upstream issue or pull-request text kept in `candidates/**` (for example `ISSUE.md`) | The [respective upstream project's license](THIRD_PARTY_NOTICES.md) |
 
 To cite the benchmark, use [CITATION.cff](CITATION.cff). Recommended attribution for CC BY 4.0 material: “Unfix benchmark by U-Pump, https://github.com/u-pump/unfix-bench, licensed under CC BY 4.0”.
 
