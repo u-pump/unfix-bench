@@ -1,111 +1,145 @@
 # BENCH-20: bug miner for unfix-bench (plan, nothing implemented)
 
-Status: **plan for the owner's review.** Nothing in this document has been built or run. Every number is one of three kinds, always marked: **измерено** (read from GitHub/OSV on 2026-11-14, by reading, no builds), **оценка** (my estimate), **не проверено**.
+Status: **plan for the owner's review, revision 2** (after the owner's answers in PR #28 and a read-only check of the verifier's code). Nothing here has been built or run. Numbers are marked: **измерено** (read from GitHub/OSV on 2026-11-14, by reading), **оценка**, **не проверено**, **не установлено** (the code does not answer it).
 
-## 0. Что я нашёл, пока читал источники (важное для решения)
+## 0. Что умеет верификатор сегодня (по коду `D:\c-plus`, только чтение)
 
-1. **Верификатор сейчас умеет только CMake.** `scripts/verify_cases.py` пишет `cplus.yaml` с `build_system: cmake`, защищёнными путями `test/** tests/** .github/**`, а `reference_test_name` проходит проверку только вида `Suite.Name` (Google Test). Zephyr (west/twister, ztest), NuttX (make, ostest), littlefs (свой Python-раннер) и Unity-тесты mbedTLS (`.data`-файлы) этому формату не соответствуют. Что из этого `cplus` умеет на самом деле, я знать не могу (исходники приватные). **Это вопрос №1 к владельцу**: от ответа зависит порядок источников.
-2. **lwIP и littlefs не проекты OSS-Fuzz** (измерено: в `google/oss-fuzz/projects/` нет каталогов `lwip` и `littlefs`; `mbedtls` есть). Запрос OSV `ecosystem=OSS-Fuzz, package=mbedtls` вернул **1** запись (2022), по `lwip` и `littlefs` — 0. Диапазон `introduced/fixed` в OSV — результат бисекта OSS-Fuzz, а не обязательно коммит с фиксом: для OSV-2022-1223 «fixed» указывает на коммит «CID update to RFC 9146». Воспроизводящий вход лежит в трекере и требует входа. Вывод: OSS-Fuzz как *канал поиска* слабый; рабочий путь для fuzz-находок — обычные fix-коммиты с регрессионным тестом в самом репозитории (mbedTLS, lwIP, littlefs).
-3. **Zephyr даёт много кандидатов.** Измерено: 475 смерженных PR с меткой `bug` после 2026-06-01. Из выборки в 30 PR с «fix» в заголовке 5 имели одновременно тест и исходник в диффе.
-4. **Бэкпорты дублируют кейсы** (mbedTLS #10984 и #10985 — одна правка для веток 3.6 и 4.1). Нужна дедупликация.
+| Возможность | Ответ | Где в коде |
+|---|---|---|
+| Система сборки CMake | да | `src/cplus/project_manifest.py:50` (`Literal["cmake","make"]`), автоопределение `project_setup.py:236-246` |
+| Система сборки Make | да, но только как команда `make`; тест-команду автоопределение даёт лишь для CTest (`test_command = ""` без CTest) | `project_manifest.py:50`, `project_setup.py:248`, `:254` |
+| Другие системы (west, ninja как отдельная система, Bazel…) | нет: поле манифеста принимает только `cmake`/`make`, лишние значения запрещены (`extra="forbid"`) | `project_manifest.py:47-50` |
+| Раннер CTest | да (основной путь: `ctest --test-dir build -R <тест>`) | `bug_check/engine.py:170`, `:297`; `gates/regression.py:50-51` (JUnit из ctest) |
+| Google Test | да: распознавание `TEST/TEST_F/TEST_P`, имя `Suite.Name`, изоляция через `GTEST_FILTER` | `bug_check/fix_tests.py:89-90`, `:179-186`; `verify.py:665-673`; `reference_overlay.py:29-32` |
+| Catch2 | да: `TEST_CASE("…")` | `fix_tests.py:88`; `reference_overlay.py:30` |
+| Unity | **частично**: имя `void test_*(void)` распознаётся (в том числе `( void )` с пробелами) и вывод Unity разбирается в проверке регрессий; **извлечение эталонного блока (reference overlay) для Unity не реализовано** (только gtest/Catch2) | `fix_tests.py:91`, `:96-97`; `gates/regression.py:95-96`; `reference_overlay.py:28-33`; тест на распознавание — `tests/test_bug_check.py:337`; тест на режим эталона с Unity **не найден** |
+| CMock | отдельной поддержки нет; CMock-тесты — это Unity-исполняемые файлы через CTest | в `src/` нет упоминаний `cmock` (поиск по коду) |
+| ztest / twister / west / native_sim | **нет**: в `src/` и `docs/` упоминаний нет | поиск по коду, 0 совпадений |
+| check (libcheck) | нет, упоминаний нет | поиск по коду |
+| Задание имени эталонного теста | `--reference-test-name` вместе с `--reference-test-from-fix`; имя обязано быть среди добавленных тестов фикса (`added_test_names`) | `cli.py:215-223`; `verify.py:616-624` |
+| Выбрать один тест внутри CTest-цели | **только для Google Test** (`GTEST_FILTER=<Suite.Name> ctest …`, имя по регулярке `[A-Za-z_]\w*\.[A-Za-z_]\w*`). Для Unity/Catch2 фильтра внутри одного исполняемого файла в коде нет; доступна лишь гранулярность CTest-теста (`-R`). Как `cplus` поведёт себя при эталоне Unity-функции — **не установлено** | `verify.py:665-673`; `engine.py:297`; `cli.py:274` |
+| Тест, добавленный как строка в файл данных (mbedTLS `tests/suites/*.data`) | **нет**: без `TEST`/`TEST_CASE`/`void test_*(void)`/`add_test` фикс получает ошибку «the fix adds no recognizable test to run on the base» | `bug_check/engine.py:290-291`; `fix_tests.py:81-125` |
 
-## 1. Источники: поиск, запуск одного теста, риски
+**Что ограничивает `verify_cases.py` до cmake + `Suite.Name`: частично обвязка, частично сам `cplus`.**
+- Обвязка: `verify_cases.py:399` жёстко пишет `build_system: cmake` (сам `cplus` принял бы и `make`), `:402` — защищённые пути `test/** tests/**…` (в `cplus` по умолчанию другие, `project_manifest.py:61`), `:408` — регулярка `Suite.Name` для `reference_test_name`, `:414` — команда `GTEST_FILTER=…`. Для Unity/Catch2-кейсов это бенч-слой нужно расширять отдельным PR.
+- Сам `cplus`: изоляция одного теста внутри цели существует только для gtest-имён (`verify.py:665-667`), а блок эталона извлекается только для gtest/Catch2 (`reference_overlay.py:28-33`). Это ограничения продукта.
 
-Общий механизм поиска: GitHub REST `search/issues` + `pulls/N/files` (дешёвый фильтр по списку файлов без клонирования), затем клон на `base` (родитель первого коммита PR) и `fix`.
+## 1. Порядок источников = что верификатор умеет сегодня
 
-| Источник | Поиск | Запуск одного теста | Примеры (прочитаны, без сборки) | Главные риски |
-|---|---|---|---|---|
-| **Zephyr** (Apache-2.0) | PR `is:merged label:bug`, в файлах есть `tests/` и исходник вне тестов | `west build -b native_sim tests/<path>` и запуск `build/zephyr/zephyr.exe`; фильтр ztest `-test=suite::name` (не проверено) | [#122423](https://github.com/zephyrproject-rtos/zephyr/pull/122423) stream_flash, тест `tests/subsys/storage/stream/stream_flash` (native_sim в `tests.yaml`), 2026-11-09, merge `574d9e437269332b421388f341b68b9c5ed48ac6`; [#122400](https://github.com/zephyrproject-rtos/zephyr/pull/122400) DNS QNAME, `tests/net/lib/dns_packet`, 2026-10-20, merge `dc4a55f1fdd4bc30cef844329a4471c5b40664b9` (в теле «Fixes #1» — issue нет, ISSUE.md из текста PR, как в fmt-кейсах) | `west update` тянет модули из сети; снимок для агента должен содержать их и собираться offline; размер снимка и место на раннере **не проверено**; SDK/32-бит; часто нет issue, только PR |
-| **NuttX** (Apache-2.0) | `apache/nuttx` и `apache/nuttx-apps`, PR «fix» | `sim:ostest` / отдельные тест-приложения из `nuttx-apps`, make | [nuttx-apps#3998](https://github.com/apache/nuttx-apps/pull/3998) FAT FSINFO + тест `testing/fs/fatgap`, 2026-11-11, merge `304f5fd353e85b7789963bce11fef4229672ead9` | тесты живут в другом репозитории (два закреплённых коммита); новый тест — целое приложение на 700+ строк, плохо выбирается как эталон; в выборке из 40 PR ядра пар «тест + исходник» не нашлось (измерено: 0 из 40) |
-| **FreeRTOS** (MIT) | `FreeRTOS-Plus-TCP` (unit-тесты Unity/CMock, CMake/ctest), `FreeRTOS-Kernel` (POSIX-порт) | `cmake` + `ctest -R <тест>` в `test/unit-test/<модуль>` — формат ближе всего к текущему | [Plus-TCP#1357](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/pull/1357) IPv6 bounds, тест в `test/unit-test/FreeRTOS_Sockets_IPv6`, 2026-08-06, merge `4e95d077203b86b103315fa90ad7889077467697` | у Kernel в выборке пар «тест + исходник» не нашлось (измерено: 0 из первых 30 «fix»), его тесты в отдельном репозитории (не проверено); Unity-тест не `Suite.Name` |
-| **mbedTLS** как fuzz-канал (Apache-2.0 OR GPL-2.0-or-later; GitHub показывает NOASSERTION, SPDX записывать вручную) | OSV `api.osv.dev/v1/query` — мало (1 запись); основной путь: PR со словом fuzz/oss-fuzz и тестом в `tests/suites/*.data` | `cmake` + `ctest -R test_suite_<name>` | [mbedtls#10985](https://github.com/Mbed-TLS/mbedtls/pull/10985) x509 пустой AuthorityKeyIdentifier (тест — строка в `test_suite_x509parse.data`), 2026-10-21, merge `5e889b385f67e3d402741094713714b9c6ea1bc0` | тест — запись в `.data`, а не именованный тест; бэкпорты; двойная лицензия |
-| **lwIP** (BSD-3-Clause) | fix-коммиты с изменением `test/unit` | unit-тесты (check), способ запуска не проверен | не искал (последний коммит 2026-11-08) | не OSS-Fuzz; формат unit-тестов не проверен |
-| **littlefs** (BSD-3-Clause) | PR «fix» с тестом в `tests/` | `make test` — собственный раннер, не CMake | [littlefs#1099](https://github.com/littlefs-project/littlefs/pull/1099) (2025-05-13, до июня 2026) | не CMake; последний коммит 2026-03-24 — мало свежих фиксов |
-| **Betaflight** (запасной) | не исследовал | — | — | **не проверено** |
+Решение владельца: порядок определяется возможностями верификатора. Итог чтения кода:
 
-## 2. Оценка выхода
+| Приоритет | Источник | Стыковка с `cplus` сегодня |
+|---|---|---|
+| 1 | **FreeRTOS-Plus-TCP** (MIT, CMake + ctest, Unity/CMock) | распознаётся имя Unity-функции и вывод; эталонный блок Unity не извлекается (нужен лишь при пересечении патча агента с тестом, `verify.py:1082`); граница — один ctest на модуль, не на функцию |
+| 2 | **Ядровые библиотеки FreeRTOS: coreMQTT, coreHTTP, coreJSON, corePKCS11** (MIT, тот же стек Unity/CMock/CMake) | то же, что выше; прочитанный пример coreMQTT#383 добавляет `void test_…( void )` |
+| 3 | **mbedTLS** | **не подходит сегодня**: тест чаще строка `.data` (пример #10985), «распознаваемого теста» нет (`engine.py:291`) |
+| 4 | Zephyr, NuttX, littlefs | нужна доработка продукта, раздел 3 |
 
-Измерено: из 30 «bug/fix» PR Zephyr 5 прошли дешёвый фильтр «тест + исходник» (≈17%). Дальше всё **оценка**: 3/3 падение на базе, 3/3 прохождение на фиксе, сборка ≤ 30 мин, лицензия и issue-текст отсекают ещё 60–80%. Тогда один кейс = 15–30 просмотренных PR (**оценка**), на 90 новых кейсов ≈ 1500–2700 просмотренных PR и ≈ 300–500 полных базовых прогонов (**оценка**). Вилка широкая; пилот (раздел 4) её сузит, и я пересчитаю.
+mbedTLS шаг 1 **не подтвердил**, поэтому заменён в пилоте (раздел 4). Для mbedTLS остаётся отдельная задача продукта (распознавание `.data`/`.function`).
 
-Распределение 90 новых кейсов (плюс 10 существующих; fmt = 7 из 100):
+Общий механизм поиска: GitHub REST `search/issues` + `pulls/N/files` (фильтр по списку файлов без клонирования), затем клон на `base` и `fix`.
 
-| Источник | Новых кейсов | Доля из 100 |
-|---|---:|---:|
-| Zephyr | 28 | 28% |
-| FreeRTOS (Plus-TCP, Kernel) | 15 | 15% |
-| mbedTLS | 15 | 15% |
-| NuttX (+apps) | 12 | 12% |
-| lwIP | 8 | 8% |
-| littlefs | 8 | 8% |
-| Betaflight | 4 | 4% |
+Прочитанные примеры (без сборок):
+- FreeRTOS-Plus-TCP [#1357](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/pull/1357): IPv6 bounds, 2026-08-06, merge `4e95d077203b86b103315fa90ad7889077467697`; добавляет `void test_FreeRTOS_inet_ntop6_MaxAddressExactSize( void )` (имя совпадает с регуляркой Unity). Сборка юнит-тестов обращается к git submodule (`test/unit-test/CMakeLists.txt:79`, **измерено** на коммите фикса): нужна сеть при сборке (**не проверено**, допустима ли в песочнице).
+- coreMQTT [#383](https://github.com/FreeRTOS/coreMQTT/pull/383): bounds в подписке, 2026-08-06, merge `a664bbb07938a8dea6d25cc7d20f581d5fba64c6`; тест `test_MQTTV5_Subscribe_WildcardCheck_HonorsTopicFilterLength`; рядом CBMC-доказательство (в пакет фикса не нужно: файлы `test/cbmc/**`, не запускаются). Также [#382](https://github.com/FreeRTOS/coreMQTT/pull/382) (2026-08-13), coreHTTP [#194](https://github.com/FreeRTOS/coreHTTP/pull/194) (2026-01-15), coreJSON [#179](https://github.com/FreeRTOS/coreJSON/pull/179) (2025-12-05). У всех в диффе есть и тест, и исходник (**измерено** по списку файлов); что тест — именно `void test_*(void)` и что он падает на базе 3/3, **не проверено**.
+- Лицензии (**измерено**, GitHub): FreeRTOS-Plus-TCP, coreMQTT, coreHTTP, coreJSON, corePKCS11 — MIT.
 
-Правило: не более 30% кейсов из одного проекта (Zephyr — один проект, потолок 30). Майнер проверяет долю при выборке и при превышении пишет отказ `project_cap`. Если часть источников окажется невозможной (вопрос №1), доли пересчитываются, а не добираются другим проектом сверх потолка.
+Правило **fuzz-происхождения**: метка ставится только если коммит или issue прямо ссылается на фаззер/OSS-Fuzz. Иначе поле пусто. lwIP и littlefs проектами OSS-Fuzz не называем.
 
-**Дата и контаминация.** Записываем `fix_date` и `post_cutoff` (фикс позже 2026-06-30, граница в конфиге). Предлагаю держать **не менее 50% новых кейсов с фиксом после июня 2026** и показывать результаты в README отдельно по двум группам. Дата отсечения обучения проверяемых моделей (claude-opus-5-5, gpt-6-sol) мне неизвестна (**не проверено**), поэтому «после июня» — осторожный ориентир, а не гарантия, что решения нет в обучении. Для Zephyr свежих кейсов достаточно (475 PR с `bug` после июня, измерено), у littlefs их почти нет.
+## 2. Состав 100 кейсов и оценка выхода
 
-## 3. Схема каталогов, журнал отказов, scripts, workflow
+100 = 10 существующих + 90 новых. **Потолок 30% на проект считается от 100** (то есть ≤ 30 кейсов на проект, вместе с уже имеющимися: fmt уже даёт 7 из 100).
+
+Распределение 90 новых по приоритету (**предложение**, зависит от того, какие форматы `cplus` освоит):
+
+| Группа | Новых кейсов | Условие |
+|---|---:|---|
+| FreeRTOS-Plus-TCP | 25 | сегодня, с ограничениями раздела 0 |
+| coreMQTT + coreHTTP + coreJSON + corePKCS11 | 15 (≤ 30 из любого одного) | сегодня |
+| mbedTLS | 15 | после доработки «.data/.function» (раздел 3) |
+| Zephyr | 20 | после доработки ztest/native_sim |
+| NuttX, littlefs, lwIP | 15 | после доработок или отказ, если доработок нет |
+
+Если доработки продукта не будут сделаны, выбираем только строки «сегодня» и честно останавливаемся на меньшем числе (на ориентир около 40 новых кейсов, **оценка** по числу прочитанных кандидатов; не обещание). Пересчёт после пилота.
+
+Выход (**оценка**, кроме двух измеренных чисел): у Zephyr из 30 «fix»-PR 5 прошли дешёвый фильтр «тест + исходник» (**измерено**, ≈17%); для FreeRTOS-библиотек измерен только наличие тест+исходник в диффе. Дальнейший отсев (3/3 на базе, 3/3 на фиксе, сборка ≤ 30 мин, лицензия, issue) — 60–80% (**оценка**), итого 15–30 просмотренных PR на кейс (**оценка**). После пилота заменяем замером.
+
+**Даты.** Для каждого кейса записываем `fix_date`, `post_cutoff` (фикс после **2026-06-30**, граница в конфиге). Требование: **не менее 50% новых кейсов с фиксом после 2026-06-30**. В README результаты таких кейсов показываются **отдельной таблицей/строкой**. О датах обучения моделей ничего не утверждаем.
+
+## 3. Нужна доработка продукта (отдельная задача в D:\c-plus после пилота; в этом PR не делается)
+
+Все оценки трудозатрат — **оценка**, не обязательство.
+
+| Что нужно в `cplus` | Для кого | Оценка |
+|---|---|---|
+| Эталонный блок для Unity-функции (`void test_*(void)`) в `reference_overlay` + тест на режим эталона | FreeRTOS-библиотеки, mbedTLS | малая: 2–4 дня |
+| Фильтр одной Unity-функции внутри исполняемого файла (или правило «эталон = ctest-тест целиком») | FreeRTOS-библиотеки | малая: 2–4 дня; решение по семантике нужно от владельца |
+| Распознавание тестов в mbedTLS (`.data`-строки и `.function`-макросы), имя = пара «набор + строка» | mbedTLS | средняя: 1–2 недели |
+| Тест-команда для проектов на Make без CTest (`make test`/свой раннер), разбор имён | littlefs, часть NuttX | средняя: 1–2 недели |
+| `west build -b native_sim` + запуск `zephyr.exe`, ztest (`ZTEST(suite, name)`), фильтр теста, образ с toolchain и модулями | Zephyr | большая: 3–5 недель; сначала проверка осуществимости |
+| NuttX `sim:ostest`, два репозитория (nuttx + nuttx-apps) с закреплёнными коммитами | NuttX | большая: ≥ 4 недели; осуществимость **не проверена** |
+| Разрешение сетевых загрузок при сборке (submodules, west) в песочнице верификатора: политика | FreeRTOS-Plus-TCP, Zephyr | **не установлено** (`network: on` по умолчанию, `project_manifest.py:55-56`; как это работает в образе верификатора, из кода не видно) |
+
+Модули west в приватный снимок включать допустимо, только нужные для сборки и только если лицензии позволяют; размер измеряется **в пилоте**, не сейчас.
+
+## 4. Пилот: 10 кандидатов
+
+Состав: **5 FreeRTOS-Plus-TCP + 5 из ядровых библиотек FreeRTOS (coreMQTT, coreHTTP, coreJSON)** вместо 5 mbedTLS (mbedTLS не подтверждён шагом 1, см. раздел 0). Обоснование: тот же Unity/CMake/ctest-стек, MIT, есть фиксы после 2026-06-30 (coreMQTT#383, #382, Plus-TCP#1357). Недостаток: пилот проверяет один тест-стек; поэтому в пилот добавляется измерение размера снимка, времени сборки и необходимость сети (submodules).
+
+Успех пилота (пороги — мои предложения):
+1. Пайплайн дошёл от `discover` до PR `candidates/` без ручных правок.
+2. Каждый отказ записан с кодом причины; записей без причины нет.
+3. Хотя бы 3 из 10 прошли весь фильтр; время сборки, размер и потребность в сети измерены и записаны (заменят оценки).
+4. Повтор запуска даёт те же результаты baseline.
+5. Установлено на этих 10, судит ли `cplus` Unity-кандидат в режиме эталона: либо «да», либо точная причина отказа (вход для задачи раздела 3).
+6. Измерен размер приватного снимка; если включены модули/submodules, указаны лицензии.
+
+Пилот не запускает агентов и не публикует кейсы.
+
+## 5. Схема каталогов, журнал отказов, scripts, workflow
 
 ```
-candidates/                      # не cases/; публикация только владельцем
+candidates/                      # не cases/; публикация и перенос только владельцем
   <id>/
     case.yaml                    # схема как у cases/: id, repo, base, upstream_fix, bug_test, reference_selection,
                                  # issue_url, fix_url, license, category, build, test, baseline_reproduction
-    meta.yaml                    # source, spdx, fix_date, post_cutoff, upstream_pr, dedupe_key, mined_run_url, miner_version
-    ISSUE.md                     # черновик; удаляемые подсказки перечислены в ISSUE.removals.md
-    baseline.log                 # 3 прогона на base (ожидается FAIL) и 3 на fix (PASS), урезанные
+    meta.yaml                    # source, spdx, fix_date, post_cutoff, upstream_pr, fuzz_origin (пусто или ссылка),
+                                 # dedupe_key, mined_run_url, miner_version
+    ISSUE.md                     # черновик; удалённые подсказки перечислены в ISSUE.removals.md
+    baseline.log                 # 3 прогона на base (FAIL) и 3 на fix (PASS), урезанные
   _rejected/<source>.jsonl       # журнал отказов, только дописывается
   _runs/<run-id>/summary.json    # сколько просмотрено, сколько отсеяно по причинам
 ```
 
-Запись журнала (одна JSON-строка): `{"source","project","ref","fix_commit","stage","reason_code","detail","fix_date","miner_run"}`. `stage`: `discover | static | build | baseline | fix_run | license | issue | cap`. Коды: `no_test_in_diff`, `test_only_fix`, `source_only_fix_no_test`, `duplicate_backport`, `base_not_failing_3of3`, `fix_not_passing_3of3`, `build_failed`, `over_30_min`, `needs_hardware`, `needs_network_dependency`, `test_not_selectable` (как fmt #4498), `license_unclear`, `no_issue_text`, `project_cap`. В публичные результаты это не попадает как NOT_VERIFIABLE: это «не кандидат». Существующий `docs/candidates.md` остаётся ручной публичной таблицей владельца; из журнала в неё попадает только то, что владелец решит показать.
+Запись журнала (JSON-строка): `{"source","project","ref","fix_commit","stage","reason_code","detail","fix_date","miner_run"}`. `stage`: `discover | static | build | baseline | fix_run | license | issue | cap`. Коды: `no_test_in_diff`, `test_only_fix`, `duplicate_backport`, `base_not_failing_3of3`, `fix_not_passing_3of3`, `build_failed`, `over_30_min`, `needs_hardware`, `needs_network_dependency`, `test_not_selectable` (как fmt #4498), `unsupported_by_verifier` (формат из раздела 3), `license_unclear`, `no_issue_text`, `project_cap`. В публичных результатах это «не кандидат», не NOT_VERIFIABLE. Дедупликация бэкпортов — как в первой версии плана: один ключ на суть правки, бэкпорты в ветки считаются одним кейсом (пример: mbedTLS #10984 и #10985).
 
-`scripts/mine/` (новое; существующие скрипты агента не трогаем):
-- `discover.py` — адаптеры источников (GitHub PR, OSV); вывод — список кандидатов JSON.
-- `filters.py` — статические фильтры (тест + исходник в диффе, не бэкпорт, лицензия из allowlist SPDX, дата).
-- `baseline.py` — клон, сборка, 3 прогона на base и 3 на fix, лимит времени.
-- `draft.py` — запись `candidates/<id>/`; `rejects.py` — журнал; `cap.py` — доля проекта.
-- Тесты: записанные JSON-ответы API (без сети), временные git-репозитории для `baseline.py`, проверка схемы `case.yaml` против существующих `cases/*/case.yaml`.
+`scripts/mine/`: `discover.py` (адаптеры GitHub), `filters.py` (тест+исходник в диффе, не бэкпорт, SPDX из allowlist, дата), `baseline.py` (клон, сборка, 3+3 прогона, лимит времени), `draft.py`, `rejects.py`, `cap.py` (потолок 30% от 100). Тесты: записанные ответы API (без сети), временные git-репозитории, проверка схемы против `cases/*/case.yaml`.
 
-`.github/workflows/mine-candidates.yml`: только `workflow_dispatch` (входы `source`, `query` или список кандидатов, `max_candidates`); джобы `discover` (без сборок, `contents: read`) → `baseline` (матрица, `max-parallel`, `timeout-minutes: 30` на кандидата, `actions/cache` для ccache/west) → `collect` (артефакт; перед загрузкой тот же скан секретов, что в `run-claude-code.yml`) → `record` (открывает PR с `candidates/`; единственная джоба с правом записи; сборка чужого кода идёт без секретов и без записи). Ключей агентов и доступа к `bench-in-*` нет. Тяжёлые сборки только в Actions.
+`.github/workflows/mine-candidates.yml`: только `workflow_dispatch` (`source`, список или запрос, `max_candidates`); джобы `discover` (без сборок, `contents: read`) → `baseline` (матрица, `max-parallel`, `timeout-minutes: 30`, кеш) → `collect` (артефакт после скана секретов как в `run-claude-code.yml`) → `record` (PR с `candidates/`; единственная джоба с записью; чужой код собирается без секретов). Доступа к `bench-in-*` и ключам агентов нет. Тяжёлые сборки только в Actions.
 
-## 4. Пилот: 5 Zephyr + 5 из fuzz-источников
+## 6. Изменения в docs/protocol.md и docs/DECISIONS.md (после «да»)
 
-Из-за п. 0.2 предлагаю заменить «5 из OSS-Fuzz» на **5 кандидатов fuzz-происхождения из mbedTLS** (PR со словом fuzz/oss-fuzz и регрессионным тестом в репозитории). Если их не найдётся, пилот честно фиксирует, что канал OSS-Fuzz для этих проектов кандидатов не даёт. Нужно решение владельца (вопрос №2).
+`docs/protocol.md`, раздел «Candidate selection»: критерии отбора; дедупликация бэкпортов; потолок 30% от 100; поля `fix_date`, `post_cutoff` и отдельное представление результатов кейсов после 2026-06-30; правило `fuzz_origin` только по прямой ссылке; журнал отказов вместо NOT_VERIFIABLE; заморозка `bug_test` до запуска агента без изменений. `docs/DECISIONS.md`, запись BENCH-20: порядок источников по возможностям верификатора; `candidates/` отдельно от `cases/`; потолок; граница даты без утверждений о моделях; Zephyr/NuttX/littlefs ждут доработки продукта; модули west в снимок только нужные и по лицензии.
 
-Успех пилота (пороги — мои предложения):
-1. Пайплайн дошёл от `discover` до PR `candidates/` без ручных правок.
-2. Каждый отказ записан с кодом; записей без причины нет.
-3. Хотя бы 3 из 10 прошли весь фильтр; время сборки и размер по каждому измерены и записаны (заменят оценки выше).
-4. Повтор того же запуска даёт те же результаты baseline.
-5. Выяснено, способен ли `cplus` судить кандидат хотя бы одного нового формата (Zephyr или Unity); если нет, пилот фиксирует границу и план пересматривается.
+## 7. Риски и что не делаем
 
-Пилот не запускает агентов.
+Риски: Unity в режиме эталона не проверен (раздел 0); сеть при сборке (submodules); размеры снимков и время сборки (**не проверено**); нестабильные тесты (условие 3/3); лицензии issue-текстов (SPDX записываем, оценку делает владелец); чужой код в CI (изоляция джоб); перекос к проектам с удобными тестами (отражаем в «Limits» README).
 
-## 5. Изменения в docs/protocol.md и docs/DECISIONS.md (после «да»)
+Не делаем: эксплойты, закрытые воспроизведения OSS-Fuzz, публикацию кейсов, `bench-in-*`, перенос `candidates/` в `cases/`, запуск агентов, Arduino, смену метода вердикта, выводы «какой агент лучше», доработку `cplus` в этом PR.
 
-`docs/protocol.md`, новый раздел «Candidate selection»: обязательные критерии отбора (раздел 3), дедупликация бэкпортов, лимит 30% на проект, поля `fix_date` и `post_cutoff`, раздельная публикация групп, правило заморозки `bug_test` до запуска агента без изменений, журнал отказов вместо NOT_VERIFIABLE. `docs/DECISIONS.md`, запись BENCH-20: почему `candidates/` отдельно от `cases/`, почему отбор в Actions, лимит на проект и его цифра, граница контаминации и оговорка к ней, отказ от Arduino, статус OSS-Fuzz как канала поиска.
+## 8. Разбивка на PR
 
-## 6. Риски и что сознательно не делаем
-
-Риски: поддержка форматов в `cplus` (п. 0.1); offline-сборка Zephyr/NuttX для агента и размер приватных снимков (**не проверено**); нестабильные тесты (отсеиваются условием 3/3); лицензия issue-текста и тестов (SPDX записывается, юридическую оценку делает владелец); чужой код в CI (изоляция джоб, см. раздел 3); минуты Actions и диск раннера (**не проверено**); смещение отбора к проектам с удобными тестами (фиксируем в «Limits» README).
-
-Не делаем: не пишем эксплойтов и не берём непубличные воспроизведения OSS-Fuzz, не публикуем кейсы и не создаём `bench-in-*`, не переносим `candidates/` в `cases/`, не запускаем агентов, не берём Arduino, не меняем метод вердикта, не делаем выводов «какой агент лучше».
-
-## 7. Разбивка на PR (малые, каждый с тестами)
-
-1. Схема `candidates/` + валидатор `case.yaml`/`meta.yaml` (проверка против существующих `cases/`) + правки docs/protocol.md и DECISIONS.
-2. `filters.py`, `rejects.py`, `cap.py` + тесты на фикстурах.
-3. `discover.py` для GitHub (с дедупликацией бэкпортов) + записанные ответы API.
-4. `baseline.py` для CMake-проектов + тесты на временных репозиториях + каркас `mine-candidates.yml` (только discover).
-5. Джобы baseline/collect/record (скан артефактов, статические тесты политики по образцу `test_artifact_policy.py`).
-6. Адаптер Zephyr (west/native_sim, кеш).
-7. Адаптер mbedTLS/OSV.
-8. Пилот (отдельное «да» владельца) и отчёт с реальными цифрами; затем FreeRTOS, NuttX, lwIP, littlefs — по одному PR.
+1. Схема `candidates/` + валидатор + docs/protocol.md и DECISIONS.
+2. `filters.py`, `rejects.py`, `cap.py` + тесты.
+3. `discover.py` для GitHub + дедупликация бэкпортов + фикстуры.
+4. `baseline.py` для CMake-проектов + тесты + каркас `mine-candidates.yml` (только discover).
+5. Джобы baseline/collect/record + тесты политики артефактов.
+6. Расширение бенч-обвязки `verify_cases.py` под Unity (после решения по семантике эталона; отдельно от продукта).
+7. Пилот (после «да») и отчёт с реальными цифрами.
+8. Дальше источники по одному PR, по мере готовности `cplus` (задачи раздела 3 живут в D:\c-plus).
 
 ## Вопросы к владельцу
 
-1. Что `cplus` умеет кроме `build_system: cmake` и Google Test (`Suite.Name`): west/native_sim, ztest, Unity/ctest, make? От этого зависит, с чего начинать.
-2. Пилот: заменить «5 OSS-Fuzz» на «5 fuzz-происхождения из mbedTLS» (п. 0.2)?
-3. Порог доли «после июня 2026»: 50% подходит?
-4. Входят ли 10 существующих кейсов в 100 (как в таблице выше)?
-5. Можно ли включать модули west в приватный снимок Zephyr для offline-сборки агентом (размер не измерен)?
+1. Семантика эталона для Unity: достаточно «ctest-тест модуля целиком падает на базе, проходит с фиксом», с `bug_test` = имя добавленной функции (идентификатор), или нужен фильтр на функцию?
+2. Сеть при сборке FreeRTOS (git submodule для Unity/CMock): допустима ли в песочнице верификатора, или сначала нужен предзагруженный снимок?
+3. Подтверждаете замену mbedTLS в пилоте на ядровые библиотеки FreeRTOS?
