@@ -1,0 +1,15 @@
+diff --git a/include/fmt/args.h b/include/fmt/args.h
+index 3283e6f..71824e8 100644
+--- a/include/fmt/args.h
++++ b/include/fmt/args.h
+@@ -210,7 +210,9 @@ FMT_EXPORT template <typename Context> class dynamic_format_arg_store {
+   }
+ 
+   /// Returns the number of elements in the store.
+-  auto size() const noexcept -> size_t { return data_.size(); }
++  auto size() const noexcept -> size_t {
++    return data_.size() - (named_info_.empty() ? 0 : 1);
++  }
+ };
+ 
+ FMT_END_NAMESPACE

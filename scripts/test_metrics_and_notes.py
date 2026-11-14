@@ -130,6 +130,18 @@ class ReportLinesTest(unittest.TestCase):
             self.assertIn("api.anthropic.com x9", note)
             self.assertIsNone(verify_cases.agent_network_note("c-1", "codex-cli"))
 
+    def test_reconstructed_counts_are_labelled_and_have_no_connection_counts(self) -> None:
+        proxy = {"refused_requests": 3, "refused": {"github.com": 3}, "allowed_hosts": ["api.anthropic.com"],
+                 "reconstructed": True}
+        root = self.report_dir({"cases/c-1/agents/claude-code/agent.yaml": json.dumps({"proxy": proxy})})
+        with patch.object(verify_cases, "ROOT", root):
+            note = verify_cases.agent_network_note("c-1", "claude-code")
+        assert note is not None
+        self.assertIn("refused 3 request(s)", note)
+        self.assertIn("allowed hosts: api.anthropic.com", note)
+        self.assertIn("Reconstructed from the stored proxy log, proof requests subtracted by their known number", note)
+        self.assertNotIn("allowed connections", note)
+
     def test_recorded_yaml_has_proxy_counts_tokens_and_the_note(self) -> None:
         data = collect.build_agent_yaml(
             version="2", model="m", requested_model="m", session_id="s", patch_bytes=b"diff\n",

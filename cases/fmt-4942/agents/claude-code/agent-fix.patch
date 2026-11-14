@@ -1,0 +1,57 @@
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 52b838f..922bbe9 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -2337,6 +2337,8 @@ FMT_CONSTEXPR FMT_INLINE auto write_int(OutputIt out, write_int_arg<T> arg,
+   // Write an integer in the format
+   //   <left-padding><prefix><numeric-padding><digits><right-padding>
+   // prefix contains chars in three lower bytes and the size in the fourth byte.
++  // Converting zero with precision zero produces no digits.
++  if (abs_value == 0 && specs.precision == 0) begin = end;
+   int num_digits = static_cast<int>(end - begin);
+   // Slightly faster check for specs.width == 0 && specs.precision == -1.
+   if ((specs.width | (specs.precision + 1)) == 0) {
+diff --git a/include/fmt/printf.h b/include/fmt/printf.h
+index 8d792fb..2a3d1d1 100644
+--- a/include/fmt/printf.h
++++ b/include/fmt/printf.h
+@@ -490,7 +490,8 @@ void vprintf(buffer<Char>& buf, basic_string_view<Char> format,
+           str, to_unsigned(nul != str_end ? nul - str : specs.precision));
+       arg = sv;
+     }
+-    if (specs.alt() && arg.visit(is_zero_int())) specs.clear_alt();
++    bool zero_alt = specs.alt() && arg.visit(is_zero_int());
++    if (zero_alt) specs.clear_alt();
+     if (specs.fill_unit<Char>() == '0') {
+       if (is_arithmetic_type(arg.type()) && specs.align() != align::left) {
+         specs.set_align(align::numeric);
+@@ -550,6 +551,10 @@ void vprintf(buffer<Char>& buf, basic_string_view<Char> format,
+     if (specs.type() == presentation_type::none)
+       report_error("invalid format specifier");
+     if (upper) specs.set_upper();
++    // The alternate octal form of zero is "0" even with zero precision.
++    if (zero_alt && specs.type() == presentation_type::oct &&
++        specs.precision == 0)
++      specs.precision = 1;
+ 
+     start = it;
+ 
+diff --git a/test/printf-test.cc b/test/printf-test.cc
+index baf2b16..e55030f 100644
+--- a/test/printf-test.cc
++++ b/test/printf-test.cc
+@@ -276,6 +276,14 @@ TEST(printf_test, int_precision) {
+   EXPECT_PRINTF("0x00042   ", "%-#10.5x", 0x42);
+   EXPECT_PRINTF("00042  ", "%-7.5o", 042);
+   EXPECT_PRINTF("00042     ", "%-#10.5o", 042);
++
++  EXPECT_PRINTF("", "%.0d", 0);
++  EXPECT_PRINTF("", "%.d", 0);
++  EXPECT_PRINTF("   ", "%3.0d", 0);
++  EXPECT_PRINTF("", "%.0x", 0);
++  EXPECT_PRINTF("", "%.0o", 0);
++  EXPECT_PRINTF("0", "%#.0o", 0);
++  EXPECT_PRINTF("1", "%.0d", 1);
+ }
+ 
+ TEST(printf_test, float_precision) {

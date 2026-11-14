@@ -1,0 +1,22 @@
+diff --git a/lint/peglint.cc b/lint/peglint.cc
+index 930fd2e..4fe6d42 100644
+--- a/lint/peglint.cc
++++ b/lint/peglint.cc
+@@ -174,11 +174,13 @@ int main(int argc, const char **argv) {
+     std::shared_ptr<peg::Ast> ast;
+     if (!parser.parse_n(source.data(), source.size(), ast)) { return -1; }
+ 
+-    if (opt_optimize) {
+-      ast = peg::AstOptimizer(opt_mode, opt_rules).optimize(ast);
+-    }
++    if (ast) {
++      if (opt_optimize) {
++        ast = peg::AstOptimizer(opt_mode, opt_rules).optimize(ast);
++      }
+ 
+-    std::cout << peg::ast_to_s(ast);
++      std::cout << peg::ast_to_s(ast);
++    }
+ 
+   } else {
+     if (!parser.parse_n(source.data(), source.size())) { return -1; }

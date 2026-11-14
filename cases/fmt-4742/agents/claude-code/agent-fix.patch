@@ -1,0 +1,29 @@
+diff --git a/include/fmt/printf.h b/include/fmt/printf.h
+index c2e9229..8e133b7 100644
+--- a/include/fmt/printf.h
++++ b/include/fmt/printf.h
+@@ -499,7 +499,8 @@ void vprintf(buffer<Char>& buf, basic_string_view<Char> format,
+     }
+ 
+     // Parse length and convert the argument to the required type.
+-    c = it != end ? *it++ : 0;
++    if (it == end) report_error("invalid format string");
++    c = *it++;
+     Char t = it != end ? *it : 0;
+     switch (c) {
+     case 'h':
+diff --git a/test/printf-test.cc b/test/printf-test.cc
+index 354143b..a37dfc2 100644
+--- a/test/printf-test.cc
++++ b/test/printf-test.cc
+@@ -52,6 +52,10 @@ TEST(printf_test, escape) {
+   EXPECT_EQ("% after", test_sprintf("%% after"));
+   EXPECT_EQ("before % after", test_sprintf("before %% after"));
+   EXPECT_EQ("%s", test_sprintf("%%s"));
++  EXPECT_THROW_MSG(test_sprintf("%", 42), format_error,
++                   "invalid format string");
++  EXPECT_THROW_MSG(test_sprintf("abc%-", 42), format_error,
++                   "invalid format string");
+ }
+ 
+ TEST(printf_test, positional_args) {

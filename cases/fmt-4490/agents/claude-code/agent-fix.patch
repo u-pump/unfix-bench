@@ -1,0 +1,59 @@
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 25153a4..f767dc6 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -751,6 +751,9 @@ template <typename T> struct allocator : private std::decay<void> {
+   }
+ 
+   void deallocate(T* p, size_t) { std::free(p); }
++
++  friend bool operator==(allocator, allocator) noexcept { return true; }
++  friend bool operator!=(allocator, allocator) noexcept { return false; }
+ };
+ 
+ }  // namespace detail
+@@ -827,8 +830,31 @@ class basic_memory_buffer : public detail::buffer<T> {
+ 
+  private:
+   // Move data from other to this buffer.
+-  FMT_CONSTEXPR20 void move(basic_memory_buffer& other) {
++  template <typename Alloc = Allocator,
++            FMT_ENABLE_IF(std::allocator_traits<Alloc>::
++                              propagate_on_container_move_assignment::value)>
++  FMT_CONSTEXPR20 auto move_alloc(basic_memory_buffer& other) -> bool {
+     alloc_ = std::move(other.alloc_);
++    return true;
++  }
++  // If the allocator does not propagate then copy the data from other.
++  template <typename Alloc = Allocator,
++            FMT_ENABLE_IF(!std::allocator_traits<Alloc>::
++                              propagate_on_container_move_assignment::value)>
++  FMT_CONSTEXPR20 auto move_alloc(basic_memory_buffer& other) -> bool {
++    T* data = other.data();
++    if (alloc_ == other.alloc_ || data == other.store_) return true;
++    size_t size = other.size();
++    // Perform copy operation, allocators are different.
++    this->set(store_, SIZE);
++    this->clear();
++    this->resize(size);
++    detail::copy<T>(data, data + size, this->data());
++    return false;
++  }
++
++  FMT_CONSTEXPR20 void move(basic_memory_buffer& other) {
++    if (!move_alloc(other)) return;
+     T* data = other.data();
+     size_t size = other.size(), capacity = other.capacity();
+     if (data == other.store_) {
+diff --git a/test/mock-allocator.h b/test/mock-allocator.h
+index 32c4caa..0c5aa39 100644
+--- a/test/mock-allocator.h
++++ b/test/mock-allocator.h
+@@ -48,6 +48,7 @@ template <typename Allocator> class allocator_ref {
+ 
+  public:
+   using value_type = typename Allocator::value_type;
++  using propagate_on_container_move_assignment = std::true_type;
+ 
+   explicit allocator_ref(Allocator* alloc = nullptr) : alloc_(alloc) {}
+ 

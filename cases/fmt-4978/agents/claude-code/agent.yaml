@@ -1,10 +1,33 @@
 {
   "name": "Claude Code",
-  "version": null,
-  "model": null,
-  "invocation": "claude -p",
-  "date_utc": null,
-  "environment": "Pending: attempt runs in GitHub Actions (see docs/run-claude-code.md)",
-  "patch_sha256": null,
-  "attempt_note": "Not run"
+  "version": "2.1.323 (Claude Code)",
+  "model": "claude-opus-5-5",
+  "requested_model": "claude-opus-5-5",
+  "effort": "default (not set)",
+  "date_utc": "2026-11-13T23:25:19Z",
+  "environment": "GitHub Actions ubuntu-latest; agent in a Docker container (read-only root, non-root uid, writable only /work and a tmpfs home, all capabilities dropped); container network is internal and egress goes through a proxy that allows only api.anthropic.com:443; --safe-mode, no web tools, no MCP, no memory or CLAUDE.md",
+  "invocation": "claude -p --output-format stream-json --verbose --no-session-persistence --safe-mode --strict-mcp-config --disable-slash-commands --permission-mode acceptEdits --permission-prompts none --tools Bash,Read,Edit,Write,Glob,Grep --allowedTools Bash,Read,Edit,Write,Glob,Grep --disallowedTools WebSearch,WebFetch --model claude-opus-5-5 (task text on stdin)",
+  "session_id": "e7a0ba6f-c67a-42c5-a301-4f89db8b5438",
+  "patch_sha256": "31a9c86cac793c84e8be2cf1b60e5e5bbb784d62616e7487595c6bc6563ebfad",
+  "attempt_note": "The first attempt was lost because of a bench error (run 43504157177: the patch could not be saved, fixed in PR 22); no verdict for it was ever known. This is the one allowed rerun.",
+  "metrics": {
+    "bash_commands": 7,
+    "tool_calls": 9,
+    "turns": 10,
+    "duration_seconds": 132,
+    "tokens": "not recorded"
+  },
+  "run_url": "https://github.com/u-pump/unfix-bench/actions/runs/43526170812",
+  "image": "sha256:4e6ba83623e35b97e11ad554d30dbd0eef9cbd1e97aedc2e8e555495e1a62747",
+  "network_proof": "all isolation proofs passed before the run; log in the run artifact",
+  "network_commands_seen_in_transcript": [],
+  "proxy": {
+    "refused_requests": 0,
+    "refused": {},
+    "allowed_hosts": [
+      "api.anthropic.com"
+    ],
+    "reconstructed": true,
+    "scope": "agent run only; reconstructed from the stored proxy log, proof requests subtracted by their known number (github.com 1, example.com 1, api.anthropic.com:8443 1)"
+  }
 }
