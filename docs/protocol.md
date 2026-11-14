@@ -14,7 +14,7 @@ The original `fmt-4960` `bug_test` field named `compile_test.high_precision_cons
 
 **Codex CLI** is run by the owner on a local Windows machine with [the local script](run-agent.md), once per case. It clones only the private `bench-in-<id>` snapshot, passes the exact `TASK.md` text, records the first patch without build output, and deletes the checkout.
 
-**Claude Code** is run by the [`Run Claude Code attempt` workflow](run-claude-code.md) on GitHub Actions: one case at a time, in a Docker container whose only reachable host is `api.anthropic.com`. The log of every run shows the isolation proof before the agent starts. The workflow verifies the input against `input_sha256`, saves the first patch byte-for-byte, runs the same verifier at the same pinned revision as for Codex CLI, and opens a pull request; nothing is published until the owner merges it.
+**Claude Code** is run by the [`Run Claude Code attempt` workflow](run-claude-code.md) on GitHub Actions: one case at a time, in a Docker container whose only reachable host is `api.anthropic.com`. The log of every run shows the isolation proof before the agent starts. The workflow checks that the snapshot is a single commit at the pinned HEAD with the exact `TASK.md`, saves the first patch byte-for-byte, runs the same verifier at the same pinned revision as for Codex CLI, and opens a pull request; nothing is published until the owner merges it.
 
 The agent must not receive the benchmark repository, the upstream fix or reference test, cplus source or binaries, previous results, or curator credentials. The verifier runs separately after the agent patch and metadata are submitted. CI selects changed `(case, agent)` content pairs and retains a report whose patch hash and verifier revision already match; explicit dispatch can force a rerun.
 
@@ -25,13 +25,13 @@ Both agents get the same frozen input, the same `TASK.md`, one attempt, the firs
 | | Codex CLI | Claude Code |
 | --- | --- | --- |
 | Where it ran | Local Windows machine, MSVC 2019 Build Tools | GitHub Actions `ubuntu-latest`, Docker container, GCC and Clang (the compilers of the verifier's image) |
-| Network | Not independently verified. `--sandbox workspace-write` in 8 of 10 cases; the invocation recorded for cpp-peglib-121 and fmt-4800 names no sandbox flag | Container on an internal Docker network; the only reachable host is `api.anthropic.com:443` through a proxy. Each run's log proves that `github.com` is unreachable, directly and through the proxy |
+| Network | Not restricted or measured; not independently verified. `workspace-write` is recorded in `agent.yaml` for all ten cases; the recorded invocation for cpp-peglib-121 and fmt-4800 is plain `codex exec`, without the flag | Container on an internal Docker network; the only reachable host is `api.anthropic.com:443` through a proxy. Each run's log proves that `github.com` is unreachable, directly and through the proxy |
 | Failed starts | Some attempts failed with a network error before any command and were rerun; the notes in `agent.yaml` say which | A run with no completed action is published as ERROR and not counted; the case stays open |
 | Isolation of files | Codex `workspace-write` sandbox | Read-only container root, non-root user, no capabilities, writable only the case directory and a temporary home |
 | Tools | Codex defaults | Bash, Read, Edit, Write, Glob, Grep; no web tools, MCP, memory, `CLAUDE.md`, plugins or hooks |
 | Model | `gpt-6-sol`, reasoning `medium` | `claude-opus-5-5`, effort left at the default; the exact name and the Claude Code version are recorded in `agent.yaml` |
 | Authentication | Local login | `ANTHROPIC_API_KEY` of a dedicated Console workspace with a spend limit, as a repository secret; deleted after the runs |
-| Input check | Single root commit and exact `TASK.md` | Single root commit, exact `TASK.md`, `input_sha256` recomputed from the upstream base, and a file-by-file comparison |
+| Input check | Single root commit and exact `TASK.md` | Single commit, HEAD equal to the pinned one, exact `TASK.md` (blocking). The `input_sha256` recomputation is informational only |
 | Patch capture | `git add -A` excluding `build*/`, `git diff --cached --binary` | The same commands, run in a separate container without network |
 | Verdict | Unfix verifier, pinned revision | The same |
 
