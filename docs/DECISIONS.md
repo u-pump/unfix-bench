@@ -38,3 +38,19 @@ Agent patch files use Git's `-text` attribute so a Windows checkout cannot chang
 **`input_sha256` is information only.** Recomputing it from the upstream base (`git -c core.autocrlf=false archive --format=tar <base>` followed by the bytes of `ISSUE.md` and `TASK.md`, as `protocol.md` describes) matches `case.yaml` for `cpp-peglib-121`, `fmt-4800` and `zlibng-2465` and does not match for `fmt-4490`, `fmt-4742`, `fmt-4933`, `fmt-4942`, `fmt-4960`, `fmt-4978` and `spdlog-3049`. The frozen values were not changed. Searched for the code that produced them: the history of this repository (commits `05e7dbc`, `56419c0`, `7a06435` only add the values and describe the method) and the read-only copy of the benchmark repository contain no preparation script, so the method could not be reproduced. Variants tried without a match: order of the two files, trailing newlines, CRLF, BOM, `core.eol`, `tar`, `zip` and `tar.gz` formats, `--prefix`, `--worktree-attributes`, an archive of the input repository. For the seven cases the file contents of `bench-in-<id>` are still compared with the upstream base and printed in every run log.
 
 **What differs from upstream.** In all ten input repositories the executable bit of files is not preserved. `bench-in-spdlog-3049` also differs in five non-test files (`.gitignore`, `INSTALL`, `LICENSE`, `README.md`, `cmake/spdlogConfig.cmake.in`): upstream stores them with CRLF line endings and the input repository with LF. The Codex patch for spdlog-3049 touches only `include/spdlog/async_logger-inl.h`, `include/spdlog/details/thread_pool-inl.h`, `include/spdlog/details/thread_pool.h` and `tests/test_async.cpp`, and the verifier applies a patch to the upstream base, not to the input repository, so the difference cannot change its verdict. It is stated in the report of the case (`cases/spdlog-3049/input-note.txt`).
+
+## BENCH-20: candidate drafts, selection rules, granularity of the reference test
+
+**Drafts live apart from cases.** Mined candidates go to `candidates/<id>/` (`case.yaml`, `meta.yaml`, `ISSUE.md`, `baseline.log`) and to the append-only `candidates/_rejected/*.jsonl`. They carry no `agent_input_repo` or `input_sha256`: the owner creates the private input and moves the draft to `cases/`. A rejected candidate is "not a candidate" with a reason code from a closed list, not a public NOT_VERIFIABLE.
+
+**Order of sources follows what the verifier can judge today** (read from its code, not from the README): FreeRTOS libraries first (CMake, CTest, Unity); mbedTLS needs an adapter because its tests are lines in `.data` files, which the verifier does not recognise as tests; Zephyr, NuttX, littlefs and lwIP need product work first.
+
+**Reference test granularity (changes the protocol for new cases only).** A function-level filter is used when the project has one. Without it the whole ctest test of a module may be the reference, but only if no other test of that module fails on the base (otherwise `noisy_module`); `bug_test_granularity` is recorded and shown. Existing cases are not edited.
+
+**No network for builds.** Neither the verifier nor the agent has network access during build and test. Submodules are part of the frozen snapshot at recorded commits; a candidate that cannot build with `--network none` is rejected (`needs_network_dependency`).
+
+**Cap and families.** At most 30% of the 100 cases per project, counted from 100 (10 existing + 90 new); all FreeRTOS repositories are one family.
+
+**Dates.** `fix_date` is recorded and `post_cutoff` marks fixes after 2026-06-30; at least half of the new cases should be post-cutoff and are shown separately. This is a date, not a statement about what any model has seen.
+
+**Fuzz origin** is recorded only when the commit or issue directly names a fuzzer or OSS-Fuzz.
