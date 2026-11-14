@@ -100,7 +100,14 @@ agent_exit=$?
 duration=$(( $(date +%s) - started ))
 "${SANDBOX[@]}" proxy-log "$OUT/evidence/proxy.log"
 if [ "$agent_exit" -eq 124 ] || [ "$agent_exit" -eq 137 ]; then fail "agent: timed out after 60 minutes"; fi
-[ "$agent_exit" -eq 0 ] || fail "agent: Claude Code exited with code $agent_exit"
+if [ "$agent_exit" -ne 0 ]; then
+    # A fixed-vocabulary summary of the private transcript: exit code, HTTP status, API problem
+    # (balance, key, limit, model) and whether the model answered. Never the raw message.
+    reason=$("$PY" "$HERE/collect_agent_run.py" diagnose --transcript "$PRIV/transcript.jsonl" \
+        --stderr "$PRIV/agent-stderr.log" --exit-code "$agent_exit" 2>/dev/null) \
+        || reason="agent: Claude Code exited with code $agent_exit"
+    fail "$reason"
+fi
 
 # 5. Save the first patch exactly as produced, then the evidence.
 "${SANDBOX[@]}" patch "$WORK" "$OUT/result" || fail "agent: could not save the patch"

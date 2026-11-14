@@ -179,6 +179,86 @@ def transcript_metrics(events: list[dict[str, Any]], duration_seconds: int) -> d
     }
 
 
+API_PROBLEMS = (
+    (re.compile(r"credit balance|billing|payment|insufficient (?:credit|fund)|spend limit|usage limit"),
+     "API refused: credit balance too low or spend limit reached (check the workspace balance and limit)"),
+    (re.compile(r"invalid x-api-key|invalid api key|authentication|unauthorized|permission_error|forbidden"),
+     "API refused the key: invalid, disabled, deleted or from another workspace"),
+    (re.compile(r"rate.?limit|too many requests|quota"),
+     "API rate limit reached"),
+    (re.compile(r"model.{0,40}(?:not found|not available|does not exist|unavailable)|not_found_error"),
+     "API: the model is not available for this key"),
+    (re.compile(r"overloaded|service unavailable|internal server error|api_error|bad gateway|timed? ?out"),
+     "API temporarily unavailable or timed out"),
+)
+
+
+def api_status(events: list[dict[str, Any]]) -> int | None:
+    for event in reversed(events):
+        for key in ("api_error_status", "status", "http_status"):
+            value = event.get(key)
+            if isinstance(value, int) and 100 <= value <= 599:
+                return value
+    return None
+
+
+def model_responses(events: list[dict[str, Any]]) -> int:
+    """Assistant messages that really came from the model, not synthetic error messages."""
+    count = 0
+    for event in events:
+        if event.get("type") != "assistant" or event.get("error") or event.get("isApiErrorMessage"):
+            continue
+        message = event.get("message")
+        if isinstance(message, dict) and message.get("model") != "<synthetic>" and _blocks(event):
+            count += 1
+    return count
+
+
+def diagnose_failure(events: list[dict[str, Any]], stderr_text: str = "") -> dict[str, Any]:
+    """Classify why Claude Code stopped, from fixed phrases only.
+
+    The raw API message, the transcript and stderr are never returned: only the HTTP status,
+    a classification chosen from a fixed list and counts. Reads private files, prints nothing
+    that could hold a key or model output.
+    """
+    haystack = [stderr_text]
+    for event in events:
+        if event.get("type") == "result" and isinstance(event.get("result"), str):
+            haystack.append(event["result"])
+        if isinstance(event.get("error"), str):
+            haystack.append(event["error"])
+        for block in _blocks(event):
+            if block.get("type") == "text" and (event.get("error") or event.get("isApiErrorMessage")):
+                haystack.append(str(block.get("text", "")))
+    text = chr(10).join(haystack).lower()
+    status = api_status(events)
+    problem = next((label for pattern, label in API_PROBLEMS if pattern.search(text)), "")
+    if not problem and status in (401, 403):
+        problem = API_PROBLEMS[1][1]
+    if not problem and status == 402:
+        problem = API_PROBLEMS[0][1]
+    if not problem and status == 429:
+        problem = API_PROBLEMS[2][1]
+    if not problem and status is not None and status >= 500:
+        problem = API_PROBLEMS[4][1]
+    init = any(e.get("type") == "system" and e.get("subtype") == "init" for e in events)
+    return {
+        "started_session": init,
+        "events": len(events),
+        "model_responses": model_responses(events),
+        "http_status": status,
+        "problem": problem or "no API problem recognised (unclassified failure)",
+    }
+
+
+def describe_failure(diagnosis: dict[str, Any], exit_code: int) -> str:
+    """One public line: exit code, API problem, whether the model answered."""
+    answered = diagnosis["model_responses"]
+    status = f" (HTTP {diagnosis['http_status']})" if diagnosis["http_status"] else ""
+    tail = "the model gave no response" if answered == 0 else f"the model had given {answered} responses"
+    return f"agent: Claude Code exited with code {exit_code}; {diagnosis['problem']}{status}; {tail}"
+
+
 def scan_for_secret(paths: list[Path], token: str | None) -> list[str]:
     """Names of files that contain the token or a token-shaped string. Never returns content."""
     hits: list[str] = []
@@ -286,6 +366,20 @@ def cmd_record(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_diagnose(args: argparse.Namespace) -> int:
+    transcript = Path(args.transcript)
+    events = load_events(transcript) if transcript.is_file() else []
+    stderr_path = Path(args.stderr)
+    stderr_text = stderr_path.read_text(encoding="utf-8", errors="replace") if stderr_path.is_file() else ""
+    diagnosis = diagnose_failure(events, stderr_text)
+    line = describe_failure(diagnosis, int(args.exit_code))
+    token = os.environ.get(TOKEN_ENV)
+    if (token and token in line) or TOKEN_SHAPE.search(line):
+        line = f"agent: Claude Code exited with code {int(args.exit_code)}"
+    print(line)
+    return 0
+
+
 def cmd_error(args: argparse.Namespace) -> int:
     reason = args.reason.splitlines()[0].strip()
     if verify_cases.summary_reason(reason, "") != reason:
@@ -342,6 +436,11 @@ def main(argv: list[str]) -> int:
     error.add_argument("--results-dir", required=True)
     error.add_argument("--version", default="")
     error.set_defaults(handler=cmd_error)
+    diagnose = sub.add_parser("diagnose")
+    diagnose.add_argument("--transcript", required=True)
+    diagnose.add_argument("--stderr", required=True)
+    diagnose.add_argument("--exit-code", required=True)
+    diagnose.set_defaults(handler=cmd_diagnose)
     scan = sub.add_parser("scan")
     scan.add_argument("files", nargs="+")
     scan.set_defaults(handler=cmd_scan)
