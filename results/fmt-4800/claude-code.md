@@ -4,6 +4,8 @@ Verdict: **VERIFIED**
 
 Reason: judged by upstream reference test 'printf_test.zero_positional_width_precision'; fix proven
 
+Network: the proxy refused 0 request(s) from the agent run (none); allowed hosts: api.anthropic.com. Reconstructed from the stored proxy log, proof requests subtracted by their known number.
+
 Elapsed: 36.3 s
 
 Verifier: cplus 81c0fda242fef1daf55d3164e06127d372c81caa · 2026-11-13 20:10:18 UTC

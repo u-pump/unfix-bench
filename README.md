@@ -2,6 +2,10 @@
 
 Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and firmware fixes. It doesn't write code; it reproduces the bug, applies the fix, removes it again and checks that the bug comes back.
 
+**What this is.** Ten real bugs from open-source C/C++ projects. Two AI coding agents, Codex CLI and Claude Code, each got every bug once, with the same inputs, and made one fix attempt. Each patch was then judged by the same verifier against the maintainers' own upstream test. The tables below are the outcome: one verdict per agent and case, no ranking.
+
+**How to check a verdict.** Open the case's report in [`results/`](results), take the patch from `cases/<case>/agents/<agent>/agent-fix.patch`, and follow [Check a verdict yourself](#check-a-verdict-yourself). The agents' environments differ; the differences are stated under [What the agent got](#what-the-agent-got).
+
 ## Results
 
 <!-- results:start -->
@@ -32,8 +36,11 @@ The tables are generated from the files in [`results/`](results) by `scripts/ren
 - `ISSUE.md`: the original issue text with solution-revealing passages removed.
 - The same `TASK.md` for every case: “Fix the bug described in ISSUE.md. Keep the change minimal. Run the existing tests.”
 - One attempt per agent; the first patch was saved byte-for-byte, without human edits.
-- Network: Codex CLI ran locally on Windows under its own sandbox setting (`--sandbox workspace-write` in 8 of 10 cases; the invocation recorded for cpp-peglib-121 and fmt-4800 names no sandbox flag). Whether it could reach the network was not independently verified. Claude Code runs in a container whose only reachable host is `api.anthropic.com`, proven in each run's log. The [conditions of both agents](docs/protocol.md#conditions-codex-cli-and-claude-code) are compared in the protocol.
-- `input_sha256` in each `case.yaml` identifies the frozen source archive, `ISSUE.md`, and `TASK.md` input.
+- Environment, which is not the same for the two agents:
+  - Codex CLI ran locally on a Windows machine (MSVC 2019 Build Tools) under its own `workspace-write` sandbox setting. The network was not restricted or measured; whether it could reach the network is not established. For cpp-peglib-121 and fmt-4800 the recorded invocation is plain `codex exec` and the setting is noted only in the `sandbox` field of `agent.yaml`.
+  - Claude Code ran in GitHub Actions, in a Docker container whose only reachable host is `api.anthropic.com`. An isolation proof in each run's log shows that other hosts, such as `github.com`, were unreachable, and the proxy's refusal counts are in each `agent.yaml` (`proxy`). For the first nine cases those counts were reconstructed from stored proxy logs, which the report says; token totals are recorded only for later runs.
+  - The verifier is the same, in its own Linux image. The [conditions of both agents](docs/protocol.md#conditions-codex-cli-and-claude-code) are compared in the protocol.
+- The input is a private snapshot of the broken commit, pinned in [`inputs/bench-in-heads.json`](inputs/bench-in-heads.json). `input_sha256` in each `case.yaml` identifies the frozen source archive, `ISSUE.md`, and `TASK.md` input; a recomputation from the upstream base is informational and matches for only some cases, so the pinned snapshot, not that hash, is what both agents received.
 
 ## How a verdict is decided
 
