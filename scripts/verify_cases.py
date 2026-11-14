@@ -297,6 +297,57 @@ def render(case_id: str, verdict: str, gates: dict[str, str], seconds: float | N
             f"| Check | Status |\n| --- | --- |\n{rows}\n")
 
 
+def baseline_summary(spec_path: Path) -> str:
+    """Numbers only: how the bug baseline went (runs, failures, planned runs after the fix).
+
+    Printed to the job log so a NOT_VERIFIABLE for a missing baseline can be explained.
+    No command output, paths or test text is included.
+    """
+    try:
+        data = json.loads(spec_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "bug baseline: not readable"
+    parts = [f"{key}={data[key]}" for key in ("completed_runs", "failures", "required_runs_after_fix")
+             if isinstance(data.get(key), int)]
+    runs = data.get("runs")
+    if isinstance(runs, list):
+        per_run = []
+        for run in runs:
+            if not isinstance(run, dict):
+                continue
+            fields = [f"{key}={run[key]}" for key in ("exit_code", "timed_out", "duration_seconds", "status", "verdict")
+                      if isinstance(run.get(key), (int, float, bool)) or (
+                          isinstance(run.get(key), str) and re.fullmatch(r"[A-Za-z_ -]{1,24}", run[key]))]
+            per_run.append("{" + ",".join(fields) + "}")
+        parts.append("runs=[" + " ".join(per_run) + "]")
+        parts.append("signatures=" + _signature_counts(runs))
+    for key in ("kind", "frequency", "timed_out_runs", "requested_runs", "run_timeout_s", "duration_s"):
+        value = data.get(key)
+        if isinstance(value, (int, float)) or (isinstance(value, str) and re.fullmatch(r"[a-z_]{1,24}", value)):
+            parts.append(f"{key}={value}")
+    return "bug baseline: " + " ".join(parts)
+
+
+def _signature_counts(runs: list[object]) -> str:
+    """Which failures the runs had: kind, test name, file name, line (short, character-limited)."""
+    counts: dict[str, int] = {}
+    for run in runs:
+        signature = run.get("signature") if isinstance(run, dict) else None
+        if not isinstance(signature, dict):
+            label = "none"
+        else:
+            fields = []
+            for key in ("kind", "test_name", "file", "line", "function", "exit_status"):
+                value = signature.get(key)
+                if key == "file" and isinstance(value, str):
+                    value = value.replace(chr(92), "/").rsplit("/", 1)[-1]
+                if isinstance(value, int) or (isinstance(value, str) and re.fullmatch(r"[\w .:+<>~-]{1,60}", value)):
+                    fields.append(f"{key}={value}")
+            label = "(" + ",".join(fields) + ")"
+        counts[label] = counts.get(label, 0) + 1
+    return "[" + " ".join(f"{label}x{count}" for label, count in sorted(counts.items())) + "]"
+
+
 def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | None, str | None]:
     case_dir = ROOT / "cases" / case_id
     if not case_dir.is_dir():
@@ -357,6 +408,9 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
     if reference_name is not None:
         bug_args.extend(("--command", f"GTEST_FILTER={reference_name} {case['test']}"))
     bug = quiet_stage("cplus bug baseline", "reference test did not reproduce", *bug_args)
+    verdict_words = sorted(set(re.findall(r"(REPRODUCED|NOT_VERIFIABLE|ERROR)", bug.stdout or "")))
+    print(f"{case_id}/{agent_id}: cplus bug exit={bug.returncode} words={verdict_words} "
+          f"{baseline_summary(spec) if spec.is_file() else 'no bug spec written'}", flush=True)
     if bug.returncode or "REPRODUCED" not in bug.stdout or not spec.is_file():
         raise CaseExecutionError("cplus bug baseline", "reference test did not reproduce")
     started = time.monotonic()
