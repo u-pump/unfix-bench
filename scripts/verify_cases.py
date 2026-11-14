@@ -223,9 +223,14 @@ def agent_network_note(case_id: str, agent_id: str) -> str | None:
     if not isinstance(proxy, dict) or not isinstance(proxy.get("refused"), dict):
         return None
     refused = ", ".join(f"{host} x{count}" for host, count in proxy["refused"].items()) or "none"
+    head = f"the proxy refused {int(proxy.get('refused_requests', 0))} request(s) from the agent run ({refused}); "
+    if proxy.get("reconstructed"):
+        hosts = ", ".join(proxy.get("allowed_hosts", [])) or "none"
+        return (head + f"allowed hosts: {hosts}. Reconstructed from the stored proxy log, "
+                "proof requests subtracted by their known number.")
     allowed = ", ".join(f"{host} x{count}" for host, count in proxy.get("allowed_connections", {}).items()) or "none"
-    return (f"the proxy refused {int(proxy.get('refused_requests', 0))} request(s) from the agent run ({refused}); "
-            f"allowed connections: {allowed}. Counted from the proxy log; the isolation proof's own requests are excluded.")
+    return (head + f"allowed connections: {allowed}. "
+            "Counted from the proxy log; the isolation proof's own requests are excluded.")
 
 
 def case_input_note(case_id: str) -> str | None:

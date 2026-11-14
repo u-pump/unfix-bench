@@ -93,6 +93,11 @@ class VerifyCasesSmokeTest(unittest.TestCase):
             for agent_id in ("claude-code", "codex-cli"):
                 target = case_dir / "agents" / agent_id
                 target.mkdir(parents=True)
+                if agent_id == "claude-code":
+                    # No recorded attempt, whatever the repository holds today.
+                    (target / "agent.yaml").write_text(json.dumps({"patch_sha256": None}), encoding="utf-8")
+                    (target / "agent-fix.patch").write_bytes(b"")
+                    continue
                 (target / "agent.yaml").write_bytes((source / "agents" / agent_id / "agent.yaml").read_bytes())
                 (target / "agent-fix.patch").write_bytes((source / "agents" / agent_id / "agent-fix.patch").read_bytes())
             (case_dir / "case.yaml").write_bytes((source / "case.yaml").read_bytes())

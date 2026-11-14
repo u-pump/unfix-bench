@@ -1,10 +1,37 @@
 {
   "name": "Claude Code",
-  "version": null,
-  "model": null,
-  "invocation": "claude -p",
-  "date_utc": null,
-  "environment": "Pending: attempt runs in GitHub Actions (see docs/run-claude-code.md)",
-  "patch_sha256": null,
-  "attempt_note": "Not run"
+  "version": "2.1.323 (Claude Code)",
+  "model": "claude-opus-5-5",
+  "requested_model": "claude-opus-5-5",
+  "effort": "default (not set)",
+  "date_utc": "2026-11-13T21:13:15Z",
+  "environment": "GitHub Actions ubuntu-latest; agent in a Docker container (read-only root, non-root uid, writable only /work and a tmpfs home, all capabilities dropped); container network is internal and egress goes through a proxy that allows only api.anthropic.com:443; --safe-mode, no web tools, no MCP, no memory or CLAUDE.md",
+  "invocation": "claude -p --output-format stream-json --verbose --no-session-persistence --safe-mode --strict-mcp-config --disable-slash-commands --permission-mode acceptEdits --permission-prompts none --tools Bash,Read,Edit,Write,Glob,Grep --allowedTools Bash,Read,Edit,Write,Glob,Grep --disallowedTools WebSearch,WebFetch --model claude-opus-5-5 (task text on stdin)",
+  "session_id": "a271584a-04cb-434f-9121-df736c250b7c",
+  "patch_sha256": "3c77abce6693d4d558366a2ab6e795aa3bb82aff85165acefd422683907b1863",
+  "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "metrics": {
+    "bash_commands": 9,
+    "tool_calls": 10,
+    "turns": 11,
+    "duration_seconds": 63,
+    "tokens": "not recorded"
+  },
+  "run_url": "https://github.com/u-pump/unfix-bench/actions/runs/43504157177",
+  "image": "sha256:73d026da484dc89c915da5b0e5d90d565314991002ceef69b5f21af5897f3dab",
+  "network_proof": "all isolation proofs passed before the run; log in the run artifact",
+  "network_commands_seen_in_transcript": [
+    "network error"
+  ],
+  "proxy": {
+    "refused_requests": 3,
+    "refused": {
+      "github.com": 3
+    },
+    "allowed_hosts": [
+      "api.anthropic.com"
+    ],
+    "reconstructed": true,
+    "scope": "agent run only; reconstructed from the stored proxy log, proof requests subtracted by their known number (github.com 1, example.com 1, api.anthropic.com:8443 1)"
+  }
 }

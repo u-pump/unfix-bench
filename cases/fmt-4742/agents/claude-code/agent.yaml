@@ -1,10 +1,33 @@
 {
   "name": "Claude Code",
-  "version": null,
-  "model": null,
-  "invocation": "claude -p",
-  "date_utc": null,
-  "environment": "Pending: attempt runs in GitHub Actions (see docs/run-claude-code.md)",
-  "patch_sha256": null,
-  "attempt_note": "Not run"
+  "version": "2.1.323 (Claude Code)",
+  "model": "claude-opus-5-5",
+  "requested_model": "claude-opus-5-5",
+  "effort": "default (not set)",
+  "date_utc": "2026-11-13T20:54:42Z",
+  "environment": "GitHub Actions ubuntu-latest; agent in a Docker container (read-only root, non-root uid, writable only /work and a tmpfs home, all capabilities dropped); container network is internal and egress goes through a proxy that allows only api.anthropic.com:443; --safe-mode, no web tools, no MCP, no memory or CLAUDE.md",
+  "invocation": "claude -p --output-format stream-json --verbose --no-session-persistence --safe-mode --strict-mcp-config --disable-slash-commands --permission-mode acceptEdits --permission-prompts none --tools Bash,Read,Edit,Write,Glob,Grep --allowedTools Bash,Read,Edit,Write,Glob,Grep --disallowedTools WebSearch,WebFetch --model claude-opus-5-5 (task text on stdin)",
+  "session_id": "c4e26abd-7c79-49d1-93df-e2c1880e637c",
+  "patch_sha256": "a17a457bc7fc3b5124ccd590661eb8b0c6aceba9b204fbbc701807f9eace9d51",
+  "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "metrics": {
+    "bash_commands": 10,
+    "tool_calls": 17,
+    "turns": 18,
+    "duration_seconds": 195,
+    "tokens": "not recorded"
+  },
+  "run_url": "https://github.com/u-pump/unfix-bench/actions/runs/43504157177",
+  "image": "sha256:231a50237429cf7d033c8b92c4433073b9b82c82bfab0285a093c7db459feda0",
+  "network_proof": "all isolation proofs passed before the run; log in the run artifact",
+  "network_commands_seen_in_transcript": [],
+  "proxy": {
+    "refused_requests": 0,
+    "refused": {},
+    "allowed_hosts": [
+      "api.anthropic.com"
+    ],
+    "reconstructed": true,
+    "scope": "agent run only; reconstructed from the stored proxy log, proof requests subtracted by their known number (github.com 1, example.com 1, api.anthropic.com:8443 1)"
+  }
 }
