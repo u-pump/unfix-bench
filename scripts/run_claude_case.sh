@@ -87,6 +87,8 @@ VERSION=$(sed -n 's/^claude version: //p' "$PRIV/build.log")
 IMAGE_ID=$(sed -n 's/^agent image id: //p' "$PRIV/build.log")
 "${SANDBOX[@]}" up || fail "sandbox: egress proxy did not start"
 "${SANDBOX[@]}" proof "$OUT/evidence/network-proof.log" || fail "sandbox: network isolation proof failed"
+# The proof makes its own refused requests; this snapshot lets the agent's traffic be counted alone.
+"${SANDBOX[@]}" proxy-log "$PRIV/proxy-after-proof.log"
 if [ -n "${DRY_RUN:-}" ]; then
     echo "dry run: input checked and sandbox proven; stopped before the agent, no API call"
     exit 0
@@ -114,7 +116,9 @@ fi
 "$PY" "$HERE/collect_agent_run.py" record --transcript "$PRIV/transcript.jsonl" \
     --patch "$OUT/result/agent-fix.patch" --out-dir "$PRIV" --version "$VERSION" \
     --requested-model "$MODEL" --run-url "${GITHUB_RUN_URL:-local}" --image "$IMAGE_ID" \
-    --proxy-log "$OUT/evidence/proxy.log" --duration-seconds "$duration" \
+    --proxy-log "$OUT/evidence/proxy.log" --proxy-baseline "$PRIV/proxy-after-proof.log" \
+    --attempt-note-file "$ROOT/cases/$CASE_ID/agents/claude-code/attempt-note.txt" \
+    --duration-seconds "$duration" \
     --proof-note "all isolation proofs passed before the run; log in the run artifact" \
     || fail "$(cat "$PRIV/error-reason.txt" 2>/dev/null || echo 'agent: attempt not recorded')"
 cp "$PRIV/agent.yaml" "$OUT/result/agent.yaml"
