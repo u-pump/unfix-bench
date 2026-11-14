@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - 'cases/**'
+      - 'candidates/**'
       - 'results/**'
       - 'scripts/**'
       - 'docker/**'
@@ -49,6 +50,7 @@ jobs:
           mkdir -p ../.tmp
           PYTHONPATH=scripts python -m unittest discover -s scripts -p 'test_*.py'
           python scripts/render_readme.py --check
+          python scripts/candidates.py check
           for script in scripts/*.sh; do bash -n "$script"; done
           pwsh -NoProfile -File scripts/test_run_agent_local.ps1
       - name: Lint workflow

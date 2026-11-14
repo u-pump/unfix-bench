@@ -36,3 +36,21 @@ Both agents get the same frozen input, the same `TASK.md`, one attempt, the firs
 | Verdict | Unfix verifier, pinned revision | The same |
 
 Consequences. The two agents built and tested in different environments (Windows with MSVC against Linux with GCC); the verifier builds both patches in its own Linux image. Whether Codex CLI could reach the network is not established; whether Claude Code could is excluded by the isolation proof. A single attempt per case measures that attempt, not a success rate.
+
+## Candidate selection (BENCH-20)
+
+Candidate cases are mined in GitHub Actions and kept as drafts in `candidates/<id>/`; they are not cases. Only the owner moves a draft to `cases/` and creates its private `bench-in-<id>` input. The plan is [docs/plans/bench-20-miner.md](plans/bench-20-miner.md).
+
+A candidate is accepted only if all of these hold, and every other candidate is written to the append-only log `candidates/_rejected/<source>.jsonl` with a reason code (this is "not a candidate", never a public NOT_VERIFIABLE):
+
+1. The upstream test fails on the parent 3 times out of 3 and passes with the fix 3 out of 3; the fix changes source files, not only tests or configuration.
+2. Build and test run without hardware in a Linux container in ≤ 30 minutes, and **without network**: submodules are placed in the frozen snapshot at pinned commits recorded in `case.yaml` (`submodules`: path and commit), and `case.yaml` records `build_network: none`.
+3. The project licence is on the SPDX allowlist (recorded in `case.yaml` and `meta.yaml`) and an issue or PR text exists from which solution hints can be removed.
+4. The fix date is recorded (`fix_date`). `post_cutoff` is true when the fix is dated after 2026-06-30. This is only a date; nothing is claimed about any model's training data. Results of cases with `post_cutoff: true` are shown separately; the target is at least half of the new cases.
+5. Backports of one change count once (`dedupe_key`).
+6. No project, and no organisation family (all FreeRTOS repositories are one family), provides more than 30% of the 100 cases.
+7. `fuzz_origin` is set only when the commit or issue directly refers to a fuzzer or OSS-Fuzz; otherwise it is `null`.
+
+**Granularity of the reference test** (`bug_test_granularity` in `case.yaml`: `function` or `ctest_module`). If the project has a function-level filter (for example `unity_fixture -n/-g`), the filter is used and the granularity is `function`. Only when there is no such filter may the whole ctest test of a module be the reference (`ctest_module`), and then **all** of these must hold: on the base only the tests added or changed by the upstream diff fail in that module; every other test in the module passes 3/3 (`module_other_tests: "3/3 pass"`); otherwise the candidate is rejected with the code `noisy_module`. The granularity is stated in the case report and the README. This rule applies to cases added from BENCH-20 on; the ten existing cases are not changed and carry no such field.
+
+The shape of `candidates/` is checked by `python scripts/candidates.py check` (also run in CI); it also checks that every published `case.yaml` has the shared fields.
