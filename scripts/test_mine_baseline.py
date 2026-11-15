@@ -232,6 +232,56 @@ class PipelineTest(unittest.TestCase):
             result = baseline.run_baseline(item, Path(tmp) / "w", FakeRunner(), miner_run=RUN, clone_url=str(repo), time_limit=0)
         self.assertEqual(result["rejection"]["reason_code"], "over_30_min")
 
+    def test_symlinked_junit_is_refused_and_never_read(self) -> None:
+        secret = "TOP-SECRET-OUTSIDE-THE-SIDE-DIRECTORY"
+
+        class Linking(FakeRunner):
+            def run(self, workdir: Path, command: str, timeout: int) -> baseline.Result:
+                if command.startswith("cmake"):
+                    return baseline.Result(0, "")
+                (workdir / "build").mkdir(exist_ok=True)
+                try:
+                    (workdir / "build" / "junit.xml").symlink_to(outside)
+                except (OSError, NotImplementedError):
+                    raise unittest.SkipTest("cannot create symbolic links here")
+                return baseline.Result(1, "")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            outside = Path(tmp) / "outside.txt"
+            outside.write_text(secret, encoding="utf-8")
+            result = self.go_in(tmp, Linking())
+        row = result["rejection"]
+        self.assertEqual((row["reason_code"], row["stage"]), ("build_failed", "baseline"))
+        self.assertIn("symbolic link", row["detail"])
+        self.assertNotIn(secret, row["detail"] + result["log"])
+
+    def test_symlinked_build_directory_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            side = Path(tmp) / "side"
+            elsewhere = Path(tmp) / "elsewhere"
+            side.mkdir(), elsewhere.mkdir()
+            (elsewhere / "junit.xml").write_text("<testsuites/>", encoding="utf-8")
+            try:
+                (side / "build").symlink_to(elsewhere, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("cannot create symbolic links here")
+            with self.assertRaises(baseline.BaselineError):
+                baseline.read_junit(side)
+
+    def test_missing_junit_is_none_and_a_regular_one_is_read(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            side = Path(tmp)
+            self.assertIsNone(baseline.read_junit(side))
+            (side / "build").mkdir()
+            (side / "build" / "junit.xml").write_text("<testsuites/>", encoding="utf-8")
+            self.assertEqual(baseline.read_junit(side), "<testsuites/>")
+
+    def go_in(self, tmp: str, runner: FakeRunner) -> dict[str, Any]:
+        repo, fix = make_repo(Path(tmp))
+        item = {"source": "freertos", "project": "FreeRTOS/coreMQTT", "ref": "pull/1", "fix_commit": fix,
+                "fix_date": "2026-08-06", "files": ["src/lib.c", "test/unit-test/lib_utest.c", "test/unit-test/CMakeLists.txt"]}
+        return baseline.run_baseline(item, Path(tmp) / "work", runner, miner_run=RUN, clone_url=str(repo))
+
     def test_unknown_commit_is_an_infrastructure_error_not_a_rejection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo, _ = make_repo(Path(tmp))
