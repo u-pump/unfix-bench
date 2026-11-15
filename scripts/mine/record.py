@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 import sys
 from collections import Counter
 from pathlib import Path
@@ -34,6 +35,11 @@ class RecordError(ValueError):
 def case_id(project: str, number: int) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", project.split("/")[1].lower()).strip("-")
     return f"{slug}-{number}"
+
+
+def ctest_regex(name: str) -> str:
+    """``name`` as a CMake regular expression that matches only itself (``ctest -R`` uses CMake's engine)."""
+    return re.sub(r"([\\^$.\[\]*+?()|])", r"\\\1", name)
 
 
 def pr_number(ref: str) -> int:
@@ -94,7 +100,7 @@ def draft(root: Path, item: dict[str, Any], result: dict[str, Any], log: str, ru
         "license": item["spdx"],
         "category": "unclassified (the owner sets it)",
         "build": result["build"],
-        "test": f"ctest --test-dir build -R '^{module}$' --output-on-failure",
+        "test": f"ctest --test-dir build -R {shlex.quote('^' + ctest_regex(module) + '$')} --output-on-failure",
         "bug_test_granularity": "ctest_module",
         "build_network": "none",
         "module_other_tests": "3/3 pass",

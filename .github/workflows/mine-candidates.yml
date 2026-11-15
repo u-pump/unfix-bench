@@ -219,7 +219,10 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      # The token is not left in .git/config: only the push step below receives it, for that one command.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
@@ -240,17 +243,24 @@ jobs:
           PYTHONPATH=scripts python scripts/mine/artifacts.py "$RUNNER_TEMP/collected"
           PYTHONPATH=scripts python scripts/mine/record.py apply --discovered "$RUNNER_TEMP/discover/discovered.json" \
             --collected "$RUNNER_TEMP/collected" --run-url "$RUN_URL"
-      - name: Open a pull request for the owner to review
+      - name: Commit the drafts
+        id: commit
+        run: |
+          git add -A candidates
+          if git diff --cached --quiet; then echo "Nothing to record"; echo "committed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git -c user.name='unfix-bench-bot' -c user.email='unfix-bench-bot@users.noreply.github.com' \
+            commit -qm "Mined candidates from run ${GITHUB_RUN_ID}"
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+      - name: Push and open a pull request for the owner to review
+        if: ${{ steps.commit.outputs.committed == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           branch="mine-candidates-${GITHUB_RUN_ID}"
-          git add -A candidates
-          if git diff --cached --quiet; then echo "Nothing to record"; exit 0; fi
-          git -c user.name='unfix-bench-bot' -c user.email='unfix-bench-bot@users.noreply.github.com' \
-            commit -qm "Mined candidates from run ${GITHUB_RUN_ID}"
-          git push -q origin "HEAD:refs/heads/${branch}"
+          # the token reaches git through gh's credential helper for this one command; nothing is written to the config
+          git -c credential.helper= -c "credential.helper=!gh auth git-credential" \
+            push -q "https://github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${branch}"
           {
             echo "Drafts and rejection-log rows from the [miner run](${RUN_URL}); the summary is in candidates/_runs/${GITHUB_RUN_ID}/summary.json."
             echo

@@ -144,6 +144,17 @@ class RecordTest(unittest.TestCase):
             self.assertIn("nothing was removed automatically", issue)
             self.assertTrue((env.root / "candidates" / "_runs" / "777" / "summary.json").is_file())
 
+    def test_module_name_is_escaped_as_a_regex_and_quoted_for_the_shell(self) -> None:
+        self.assertEqual(record.ctest_regex("core.http+utest"), r"core\.http\+utest")
+        it = item()
+        result = accepted_result(it)
+        result["verdict"]["module"] = "core.http+utest"
+        with tempfile.TemporaryDirectory() as tmp:
+            env = Env(tmp, [it], {0: result})
+            env.apply()
+            case = json.loads((env.root / "candidates" / "coremqtt-383" / "case.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(case["test"], r"ctest --test-dir build -R '^core\.http\+utest$' --output-on-failure")
+
     def test_rejected_baseline_goes_to_the_log_with_its_code(self) -> None:
         it = item()
         with tempfile.TemporaryDirectory() as tmp:

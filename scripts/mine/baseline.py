@@ -21,6 +21,7 @@ import json
 import os
 import re
 import shlex
+import stat
 import subprocess
 import sys
 import time
@@ -34,6 +35,7 @@ import candidates
 from mine import filters, rejects
 
 RUNS = 3
+MAX_JUNIT_BYTES = 20_000_000
 TIME_LIMIT_S = 30 * 60
 MAX_XML_BYTES = 20_000_000
 UNITY_LINE = re.compile(r"^(?P<file>[^\s:][^:\n]*):(?P<line>\d+):(?P<name>test_\w+):(?P<result>PASS|FAIL|IGNORE)\b", re.M)
@@ -254,6 +256,31 @@ def build_rejection(result: Result, which: str) -> dict[str, Any]:
     return {"accepted": False, "stage": "build", "reason_code": code, "detail": f"{which}: build failed (exit {result.returncode}): {tail}"}
 
 
+def read_junit(directory: Path) -> str | None:
+    """Text of ``build/junit.xml``, or ``None`` if absent. Raises ``BaselineError`` for a link or an escape.
+
+    The file is written by the project's own code in a mounted directory, so it is not trusted to be a regular
+    file: a symbolic link there could point at a file of this runner. Neither ``build`` nor the file may be a
+    link, the resolved path must stay inside ``directory``, and the file is opened without following links.
+    """
+    root = directory.resolve()
+    build, junit = directory / "build", directory / "build" / "junit.xml"
+    for path in (build, junit):
+        try:
+            mode = os.lstat(path).st_mode
+        except FileNotFoundError:
+            return None
+        if stat.S_ISLNK(mode):
+            raise BaselineError(f"{path.relative_to(directory).as_posix()} is a symbolic link")
+    if not stat.S_ISREG(os.lstat(junit).st_mode):
+        raise BaselineError("build/junit.xml is not a regular file")
+    if not junit.resolve().is_relative_to(root):
+        raise BaselineError("build/junit.xml resolves outside the working directory")
+    descriptor = os.open(junit, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(descriptor, "rb") as handle:
+        return handle.read(MAX_JUNIT_BYTES).decode("utf-8", errors="replace")
+
+
 def run_side(runner: Runner, directory: Path, which: str, build: str, test: str, deadline: float,
              log: list[str]) -> tuple[list[dict[str, Any]] | None, dict[str, Any] | None]:
     """Build once and run the tests ``RUNS`` times. Returns ``(runs, None)`` or ``(None, rejection)``."""
@@ -272,11 +299,15 @@ def run_side(runner: Runner, directory: Path, which: str, build: str, test: str,
             return None, {"accepted": False, "stage": "baseline", "reason_code": "over_30_min",
                           "detail": f"{which}: run {number} not finished in time"}
         done = runner.run(directory, test, remaining)
-        junit = directory / "build" / "junit.xml"
-        if done.timed_out or not junit.is_file():
+        try:
+            text = None if done.timed_out else read_junit(directory)
+        except BaselineError as error:
+            return None, {"accepted": False, "stage": "baseline", "reason_code": "build_failed",
+                          "detail": f"{which} run {number}: refused the JUnit file: {error}"}
+        if text is None:
             return None, {"accepted": False, "stage": "baseline", "reason_code": "over_30_min" if done.timed_out else "build_failed",
                           "detail": f"{which} run {number}: " + ("timed out" if done.timed_out else "ctest wrote no JUnit file")}
-        modules, functions = parse_junit(junit.read_text(encoding="utf-8", errors="replace"))
+        modules, functions = parse_junit(text)
         failed = sorted(name for name, ok in modules.items() if not ok)
         log.append(f"=== {which} run {number}: {len(modules)} ctest tests, failed: {', '.join(failed) or 'none'}")
         for module in failed:

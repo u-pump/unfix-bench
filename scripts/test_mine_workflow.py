@@ -46,10 +46,25 @@ class MineWorkflowPolicyTest(unittest.TestCase):
         for name in ("image", "baseline", "collect"):
             self.assertNotIn("github.token", job(name), name)
             self.assertNotIn("GITHUB_TOKEN", job(name), name)
-        # only the one job that writes keeps credentials in the checkout
-        for name in ("discover", "image", "baseline", "collect"):
+        # no job leaves the token in .git/config, including the one that writes
+        for name in JOBS:
             self.assertIn("persist-credentials: false", job(name), name)
-        self.assertNotIn("persist-credentials: false", job("record"))
+
+    def test_the_record_token_reaches_only_the_push_step(self) -> None:
+        block = job("record")
+        self.assertEqual(block.count("github.token"), 1)
+        steps = re.split(r"(?m)^      - ", block)
+        holders = [step for step in steps if "GH_TOKEN" in step]
+        self.assertEqual(len(holders), 1)
+        self.assertIn("git ", holders[0])
+        self.assertIn("push", holders[0])
+        self.assertIn("gh auth git-credential", holders[0])
+        for step in steps:
+            if "record.py" in step or "artifacts.py" in step:  # the steps that read artifacts never see it
+                self.assertNotIn("GH_TOKEN", step)
+                self.assertNotIn("github.token", step)
+        self.assertNotIn("extraheader", block)
+        self.assertNotIn("x-access-token", block)
 
     def test_the_record_job_runs_no_foreign_code(self) -> None:
         block = job("record")
