@@ -21,7 +21,7 @@ from typing import Any
 import candidates
 from mine import cap, rejects
 
-MINER_VERSION = "bench-20-pr5"
+MINER_VERSION = "bench-20-pr6a"
 MAX_LOG_BYTES = 200_000
 MODULE = re.compile(r"[\w.+-]{1,120}")
 FUNCTION = re.compile(r"test_\w{1,120}")
@@ -131,7 +131,7 @@ def apply(root: Path, discovered: Path, collected: Path, run_url: str) -> dict[s
                                "missing_results": [], "errors": [], "stats": data.get("stats", {})}
 
     def log_row(row: dict[str, Any]) -> None:
-        if rejects.append(root, row):
+        if rejects.append(root, row, MINER_VERSION):
             summary["rejected_logged"] += 1
 
     for row in data["rejected"]:

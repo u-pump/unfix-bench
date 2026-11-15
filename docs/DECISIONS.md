@@ -55,6 +55,10 @@ Agent patch files use Git's `-text` attribute so a Windows checkout cannot chang
 
 **Fuzz origin** is recorded only when the commit or issue directly names a fuzzer or OSS-Fuzz.
 
+## BENCH-20 pilot 1: build recipes per repository, build rejections can be re-evaluated
+
+Pilot 1 (run 43768563003) went through the whole chain and accepted 0 of 10: every baseline failure was the miner's recipe, not the candidates (a default `cmake -S .`, submodules left empty because `update = none` makes a plain `git submodule update --init` skip them, `unifdef` missing from the image). Decisions: (1) recipes live in `scripts/mine/recipes.py` with the upstream CI cite for each, and `baseline.py` picks one by repository, so the workflow passes no build options; (2) `-DBUILD_CLONE_SUBMODULES=OFF` is always set and submodules are fetched in `prepare` with `--checkout --init --recursive`, limited to https because `.gitmodules` belongs to the project being mined; (3) the image gets `unifdef` at a pinned version; (4) rejection rows carry `miner_version`; build-stage rejections are re-evaluable and never final, every other reason is final for search (an explicit list is always evaluated). Deviations of a recipe from the upstream CI (no coverage or `-Werror` flags) are written next to it.
+
 ## Known issues and backlog
 
 Small open items that are not part of a numbered task. Fix each in its own PR.

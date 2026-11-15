@@ -10,8 +10,9 @@ Granularity: no function-level filter exists for Unity yet, so the reference is 
 module (``ctest_module``). It is accepted only if on the base nothing but the functions the upstream diff
 added or changed fails in that module (otherwise ``noisy_module``).
 
-JUnit/Unity output parsing is written against the documented formats and tested on hand-written samples;
-it has **not** been checked against real CTest output yet (the pilot does that).
+JUnit/Unity output parsing was checked against real ctest/Unity output of coreJSON, coreHTTP and coreMQTT
+(offline, in docker/miner-build, 2026-11): ctest cuts the output of a passing test to 1 KB unless
+``--test-output-size-passed`` is given, so ``commands`` sets it (11 of 204 Unity lines were seen before).
 """
 
 from __future__ import annotations
@@ -32,10 +33,12 @@ from pathlib import Path
 from typing import Any, Protocol
 
 import candidates
-from mine import filters, rejects
+from mine import filters, recipes, rejects
 
 RUNS = 3
 MAX_JUNIT_BYTES = 20_000_000
+OUTPUT_PASSED = 1_000_000
+OUTPUT_FAILED = 5_000_000
 TIME_LIMIT_S = 30 * 60
 MAX_XML_BYTES = 20_000_000
 UNITY_LINE = re.compile(r"^(?P<file>[^\s:][^:\n]*):(?P<line>\d+):(?P<name>test_\w+):(?P<result>PASS|FAIL|IGNORE)\b", re.M)
@@ -200,7 +203,21 @@ def gitlinks(directory: Path, rev: str) -> dict[str, str]:
     return found
 
 
-def prepare(item: dict[str, Any], work: Path, clone_url: str | None = None) -> dict[str, Any]:
+def submodule_update(directory: Path, protocols: tuple[str, ...]) -> None:
+    """Fetch every submodule, recursively, at the commits the tree pins.
+
+    ``--checkout`` is needed on the command line: the FreeRTOS repositories set ``update = none`` in
+    ``.gitmodules``, which makes a plain ``git submodule update --init`` skip them. Only the listed transfer
+    protocols are allowed, because ``.gitmodules`` comes from the project being mined.
+    """
+    allow = ["-c", "protocol.allow=never"]
+    for protocol in protocols:
+        allow += ["-c", f"protocol.{protocol}.allow=always"]
+    git(directory, *allow, "submodule", "update", "--checkout", "--init", "--recursive", "--quiet")
+
+
+def prepare(item: dict[str, Any], work: Path, clone_url: str | None = None,
+            protocols: tuple[str, ...] = ("https",)) -> dict[str, Any]:
     """Clone, check out ``base`` (with the fix's non-source files laid over it) and ``fix``; fetch submodules.
 
     ``base`` is the first parent of the fix commit. Returns paths, commits and submodule pins.
@@ -227,7 +244,7 @@ def prepare(item: dict[str, Any], work: Path, clone_url: str | None = None) -> d
         git(work / "base", "checkout", fix, "--", *overlay)
     if pins:
         for name in ("base", "fix"):
-            git(work / name, "submodule", "update", "--init", "--recursive", "--quiet")
+            submodule_update(work / name, protocols)
     test_files = [path for path in split["test"] if path in present]
     changed: list[str] = []
     for path in test_files:
@@ -241,11 +258,23 @@ def prepare(item: dict[str, Any], work: Path, clone_url: str | None = None) -> d
 
 # ---------------------------------------------------------------- build and test
 
-def commands(cmake_dir: str = ".", options: tuple[str, ...] = ()) -> tuple[str, str]:
-    """``(build, test)`` shell commands, run inside the container at /work."""
+def commands(cmake_dir: str = ".", options: tuple[str, ...] = (), generator: str | None = None,
+             ctest_exclude: str | None = None) -> tuple[str, str]:
+    """``(build, test)`` shell commands, run inside the container at /work.
+
+    ``-DBUILD_CLONE_SUBMODULES=OFF`` is always added: nothing can be cloned while building.
+    """
     source = shlex.quote(cmake_dir)
-    configure = " ".join(["cmake", "-S", source, "-B", "build", *(shlex.quote(o) for o in options)])
-    return f"{configure} && cmake --build build -j2", "rm -f build/junit.xml; ctest --test-dir build -j1 --output-junit junit.xml"
+    parts = ["cmake", "-S", source, "-B", "build"]
+    if generator:
+        parts += ["-G", shlex.quote(generator)]
+    parts += [shlex.quote(o) for o in recipes.cmake_options(options)]
+    # ctest keeps only 1 KB of the output of a passing test by default; the Unity lines (one per test function) must stay whole
+    test = ("rm -f build/junit.xml; ctest --test-dir build -j1 --output-junit junit.xml "
+            f"--test-output-size-passed {OUTPUT_PASSED} --test-output-size-failed {OUTPUT_FAILED}")
+    if ctest_exclude:
+        test += f" -E {shlex.quote(ctest_exclude)}"
+    return f"{' '.join(parts)} && cmake --build build -j2", test
 
 
 def build_rejection(result: Result, which: str) -> dict[str, Any]:
@@ -317,11 +346,26 @@ def run_side(runner: Runner, directory: Path, which: str, build: str, test: str,
     return runs, None
 
 
-def run_baseline(item: dict[str, Any], work: Path, runner: Runner, *, miner_run: str, cmake_dir: str = ".",
-                 options: tuple[str, ...] = (), clone_url: str | None = None, time_limit: int = TIME_LIMIT_S) -> dict[str, Any]:
+def run_baseline(item: dict[str, Any], work: Path, runner: Runner, *, miner_run: str, cmake_dir: str | None = None,
+                 options: tuple[str, ...] | None = None, clone_url: str | None = None, time_limit: int = TIME_LIMIT_S,
+                 protocols: tuple[str, ...] = ("https",)) -> dict[str, Any]:
+    """Baseline one item. Without ``cmake_dir``/``options`` the recipe of the item's repository is used."""
     started = time.monotonic()
-    prepared = prepare(item, work, clone_url)
-    build, test = commands(cmake_dir, options)
+    recipe = recipes.recipe_for(item["project"])
+    if cmake_dir is None and options is None and recipe is None:
+        row = {"accepted": False, "stage": "build", "reason_code": "build_failed",
+               "detail": f"no build recipe for {item['project']} (scripts/mine/recipes.py)"}
+        return {"ref": item["ref"], "project": item["project"], "elapsed_s": 0.0, "verdict": row, "changed_functions": [],
+                "submodules": [], "build_network": "none", "build": "", "test": "", "base": None, "fix": None,
+                "rejection": rejects.make(source=item["source"], project=item["project"], ref=item["ref"],
+                                          fix_commit=item["fix_commit"], stage="build", reason_code="build_failed",
+                                          detail=row["detail"], fix_date=item["fix_date"], miner_run=miner_run),
+                "log": f"=== no build recipe for {item['project']}" + chr(10)}
+    prepared = prepare(item, work, clone_url, protocols)
+    if cmake_dir is None and options is None and recipe is not None:
+        build, test = commands(recipe.cmake_dir, recipe.options, recipe.generator, recipe.ctest_exclude)
+    else:
+        build, test = commands(cmake_dir or ".", options or ())
     deadline = started + time_limit
     log: list[str] = []
     verdict: dict[str, Any] | None = None
@@ -359,8 +403,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-url", required=True)
     parser.add_argument("--work", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
-    parser.add_argument("--cmake-dir", default=".")
-    parser.add_argument("--option", action="append", default=[], help="extra cmake option, repeatable")
+    parser.add_argument("--cmake-dir", default=None, help="manual override; by default the recipe of the repository is used")
+    parser.add_argument("--option", action="append", default=None, help="manual override: extra cmake option, repeatable")
     args = parser.parse_args(argv)
     if not candidates.RUN_URL.fullmatch(args.run_url):
         parser.error("--run-url must be a GitHub Actions run URL")
@@ -369,7 +413,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"--index {args.index} is outside the {len(accepted)} accepted items")
     try:
         result = run_baseline(accepted[args.index], args.work, DockerRunner(args.image), miner_run=args.run_url,
-                              cmake_dir=args.cmake_dir, options=tuple(args.option))
+                              cmake_dir=args.cmake_dir,
+                              options=None if args.option is None else tuple(args.option))
     except BaselineError as error:
         print(f"baseline: {error}", file=sys.stderr)
         return 1

@@ -53,6 +53,7 @@ META_FIELDS = ("source", "spdx", "fix_date", "post_cutoff", "upstream_pr", "fuzz
                "dedupe_key", "mined_run_url", "miner_version")
 REJECT_FIELDS = ("source", "project", "ref", "fix_commit", "stage", "reason_code", "detail",
                  "fix_date", "miner_run")
+REJECT_OPTIONAL = ("miner_version",)  # set when the row is written to the log (see rejects.append)
 
 
 class Problems(list[str]):
@@ -178,9 +179,11 @@ def validate_rejection(row: Any, where: str, problems: Problems) -> None:
     if not isinstance(row, dict):
         problems.add(where, "each line must be a JSON object")
         return
-    if set(row) != set(REJECT_FIELDS):
-        problems.add(where, f"fields must be exactly {', '.join(REJECT_FIELDS)}")
+    if not set(REJECT_FIELDS) <= set(row) <= set(REJECT_FIELDS) | set(REJECT_OPTIONAL):
+        problems.add(where, f"fields must be exactly {', '.join(REJECT_FIELDS)} (plus optionally {', '.join(REJECT_OPTIONAL)})")
         return
+    if "miner_version" in row and not _text(row["miner_version"]):
+        problems.add(where, "miner_version must be a non-empty string")
     if row["stage"] not in REJECT_STAGES:
         problems.add(where, f"stage must be one of {', '.join(REJECT_STAGES)}")
     if row["reason_code"] not in REJECT_CODES:
