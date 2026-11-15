@@ -29,7 +29,15 @@ GATES = (
 )
 STATUSES = {"PASS", "FAIL", "ERROR", "REVIEW", "SKIPPED"}
 VERDICTS = {"VERIFIED", "REJECTED", "REVIEW", "NOT_VERIFIABLE", "ERROR"}
-VERIFIER_REVISION = "81c0fda242fef1daf55d3164e06127d372c81caa"
+# The verifier is pinned per case. A case without ``verifier_revision`` in case.yaml is one of the first ten:
+# its results were made with this revision and stay on it (they are not verified again).
+LEGACY_REVISION = "81c0fda242fef1daf55d3164e06127d372c81caa"
+VERIFIER_REVISION = LEGACY_REVISION
+REVISION = re.compile(r"[0-9a-f]{40}")
+HTTPS_ONLY = ("-c", "protocol.allow=never", "-c", "protocol.https.allow=always")
+MODULE_IN_TEST = re.compile(r"-R\s+'?\^(.+)\$'?(?:\s|$)")
+# The reference test of a Unity case as cplus reports it, kept so the result file can say it (see main()).
+reference_lines: dict[tuple[str, str], str] = {}
 
 
 class CaseExecutionError(RuntimeError):
@@ -51,6 +59,29 @@ def quiet_stage(stage: str, reason: str, *args: str,
         return quiet(*args, cwd=cwd)
     except OSError as exc:
         raise CaseExecutionError(stage, reason) from exc
+
+
+def case_revision(case_id: str) -> str:
+    """The cplus revision this case is verified with: ``verifier_revision`` of its case.yaml, else the legacy one."""
+    case = json.loads((ROOT / "cases" / case_id / "case.yaml").read_text(encoding="utf-8"))
+    revision = case.get("verifier_revision", LEGACY_REVISION)
+    if not isinstance(revision, str) or not REVISION.fullmatch(revision):
+        raise ValueError("verifier_revision must be a full 40-hex commit")
+    return revision
+
+
+def cplus_command(revision: str) -> str:
+    """The ``cplus`` of one revision: ``$CPLUS_VENV_ROOT/<revision>/bin/cplus`` as installed by install_private.sh.
+
+    Without CPLUS_VENV_ROOT (local runs, tests) it is the ``cplus`` on PATH, and nothing guarantees its revision.
+    """
+    root = os.environ.get("CPLUS_VENV_ROOT", "").strip()
+    if not root:
+        return "cplus"
+    if not REVISION.fullmatch(revision):
+        raise CaseExecutionError("parse", "invalid verifier revision")
+    folder = "Scripts" if os.name == "nt" else "bin"
+    return str(Path(root) / revision / folder / "cplus")
 
 
 def selected_cases() -> list[str]:
@@ -91,6 +122,13 @@ def no_patch_report_is_current(case_id: str, agent_id: str) -> bool:
     return re.search(r"(?m)^Verdict: \*\*NO_PATCH\*\*$", text) is not None
 
 
+def case_revision_or_legacy(case_id: str) -> str:
+    try:
+        return case_revision(case_id)
+    except (OSError, ValueError):
+        return LEGACY_REVISION
+
+
 def report_is_current(case_id: str, agent_id: str, digest: str) -> bool:
     report = ROOT / "results" / case_id / f"{agent_id}.md"
     metadata = ROOT / "cases" / case_id / "agents" / agent_id / "agent.yaml"
@@ -104,7 +142,7 @@ def report_is_current(case_id: str, agent_id: str, digest: str) -> bool:
     return (
         agent.get("patch_sha256") == digest
         and re.search(rf"(?m)^Patch: sha256 {digest}$", text) is not None
-        and re.search(rf"(?m)^Verifier: cplus {VERIFIER_REVISION} ·", text) is not None
+        and re.search(rf"(?m)^Verifier: cplus {case_revision_or_legacy(case_id)} ·", text) is not None
     )
 
 
@@ -274,7 +312,8 @@ def render(case_id: str, verdict: str, gates: dict[str, str], seconds: float | N
            agent_name: str, agent_version: str, checked_at_utc: str,
            reason: str | None = None, result_note: str | None = None,
            patch_sha256: str | None = None, input_note: str | None = None,
-           attempt_note: str | None = None, network_note: str | None = None) -> str:
+           attempt_note: str | None = None, network_note: str | None = None,
+           revision: str = LEGACY_REVISION, reference_line: str | None = None) -> str:
     duration = "pending" if seconds is None else f"{seconds:.1f} s"
     rows = "\n".join(f"| {gate} | {gates.get(gate, 'SKIPPED')} |" for gate in GATES)
     note = "\n\nStatus: no agent fix yet" if verdict == "PENDING" else ""
@@ -296,7 +335,8 @@ def render(case_id: str, verdict: str, gates: dict[str, str], seconds: float | N
     if network_note:
         note_line += f"\n\nNetwork: {network_note}"
     return (f"# {case_id}\n\nVerdict: **{verdict}**{note}{reason_line}{note_line}\n\nElapsed: {duration}\n\n"
-            f"Verifier: cplus {VERIFIER_REVISION} · {checked_at_utc}{verifier_note}\n\n"
+            f"Verifier: cplus {revision} · {checked_at_utc}{verifier_note}\n\n"
+            + (f"Reference: {reference_line}\n\n" if reference_line else "") +
             f"Patch: {patch_line}\n\n"
             f"Agent: {agent_name} · Version: {agent_version}\n\n"
             f"| Check | Status |\n| --- | --- |\n{rows}\n")
@@ -353,6 +393,68 @@ def _signature_counts(runs: list[object]) -> str:
     return "[" + " ".join(f"{label}x{count}" for label, count in sorted(counts.items())) + "]"
 
 
+def case_gitlinks(scratch: Path, base: str) -> dict[str, str]:
+    """Submodule path -> commit pinned in the tree of ``base``."""
+    listing = quiet_stage("submodules", "snapshot unavailable", "git", "ls-tree", "-r", base, cwd=scratch)
+    if listing.returncode:
+        raise CaseExecutionError("submodules", "snapshot unavailable")
+    found = {}
+    for line in listing.stdout.splitlines():
+        meta, _, path = line.partition("\t")
+        fields = meta.split()
+        if len(fields) == 3 and fields[0] == "160000":
+            found[path] = fields[2]
+    return found
+
+
+def prepare_submodules(scratch: Path, case: dict[str, object], base: str) -> None:
+    """Fetch the submodules of the base, recursively and at the pinned commits, before cplus runs without network.
+
+    ``--checkout`` is required: these repositories set ``update = none`` in .gitmodules, which a plain
+    ``git submodule update --init`` obeys. Only https is allowed, because .gitmodules belongs to the project.
+    The pins in case.yaml must be the ones in the tree.
+    """
+    pins = case.get("submodules")
+    if not pins:
+        return
+    if not isinstance(pins, list) or not all(isinstance(pin, dict) for pin in pins):
+        raise CaseExecutionError("submodules", "invalid snapshot description")
+    expected = {pin.get("path"): pin.get("commit") for pin in pins}
+    if expected != case_gitlinks(scratch, base):
+        raise CaseExecutionError("submodules", "pins in case.yaml differ from the base revision")
+    done = quiet_stage("submodules", "snapshot unavailable", "git", *HTTPS_ONLY, "submodule", "update",
+                       "--checkout", "--init", "--recursive", "--quiet", cwd=scratch)
+    if done.returncode:
+        raise CaseExecutionError("submodules", "snapshot unavailable")
+
+
+def case_module(case: dict[str, object]) -> str | None:
+    """The ctest module a Unity case names in its ``test`` command (``-R '^module$'``), unescaped."""
+    match = MODULE_IN_TEST.search(str(case.get("test", "")))
+    return None if match is None else re.sub(r"\\(.)", r"\1", match.group(1))
+
+
+def check_unity_reference(case: dict[str, object], granularity: object, command: object, framework: object,
+                          stage: str) -> None:
+    """cplus chooses the reference test of a Unity case itself; its choice must be the one case.yaml records."""
+    if framework is None:
+        raise CaseExecutionError(stage, "cplus did not detect Unity in the checkout")
+    if granularity != case.get("bug_test_granularity"):
+        raise CaseExecutionError(stage, "cplus chose a different reference granularity than case.yaml")
+    module = MODULE_IN_TEST.search(str(command or ""))
+    if module is None or re.sub(r"\\(.)", r"\1", module.group(1)) != case_module(case):
+        raise CaseExecutionError(stage, "cplus chose a different reference test than case.yaml")
+
+
+def public_reference_line(raw: object) -> str | None:
+    """cplus's one-line description of the reference test, if it is short and has no path or log."""
+    if not isinstance(raw, str):
+        return None
+    line = " ".join(raw.split())
+    line = line.removeprefix("Reference test granularity: ")
+    return line if 0 < len(line) <= 240 and not re.search(r"[\\/]|\b(?:traceback|stdout|stderr)\b", line, re.I) else None
+
+
 def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | None, str | None]:
     case_dir = ROOT / "cases" / case_id
     if not case_dir.is_dir():
@@ -390,6 +492,7 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
     if quiet_stage("checkout base", "base revision unavailable", "git", "checkout",
                    "--quiet", "--detach", base, cwd=scratch).returncode:
         raise CaseExecutionError("checkout base", "base revision unavailable")
+    prepare_submodules(scratch, case, base)
     fix_patch = quiet_stage("upstream fix", "reference revision unavailable", "git", "diff",
                             base, fix, cwd=scratch)
     if fix_patch.returncode or not fix_patch.stdout:
@@ -408,7 +511,13 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
         or not re.fullmatch(r"[A-Za-z_]\w*\.[A-Za-z_]\w*", reference_name)
     ):
         raise CaseExecutionError("parse", "invalid reference test selection")
-    bug_args = ["cplus", "bug", "--project", str(scratch), "--from-fix",
+    try:
+        revision = case_revision(case_id)
+    except (OSError, ValueError) as exc:
+        raise CaseExecutionError("parse", "invalid verifier revision") from exc
+    cplus = cplus_command(revision)
+    unity = case.get("bug_test_granularity") is not None
+    bug_args = [cplus, "bug", "--project", str(scratch), "--from-fix",
                 str(upstream_patch), "--export", str(spec)]
     if reference_name is not None:
         bug_args.extend(("--command", f"GTEST_FILTER={reference_name} {case['test']}"))
@@ -418,8 +527,17 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
           f"{baseline_summary(spec) if spec.is_file() else 'no bug spec written'}", flush=True)
     if bug.returncode or "REPRODUCED" not in bug.stdout or not spec.is_file():
         raise CaseExecutionError("cplus bug baseline", "reference test did not reproduce")
+    if unity:
+        try:
+            recorded = json.loads(spec.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise CaseExecutionError("cplus bug baseline", "bug specification unreadable") from exc
+        if not isinstance(recorded, dict):
+            raise CaseExecutionError("cplus bug baseline", "bug specification unreadable")
+        check_unity_reference(case, recorded.get("granularity"), recorded.get("command"),
+                              recorded.get("test_framework"), "cplus bug baseline")
     started = time.monotonic()
-    verify_args = ["cplus", "verify", "--project", str(scratch), "--patch",
+    verify_args = [cplus, "verify", "--project", str(scratch), "--patch",
                    str(patch), "--bug-spec", str(spec),
                    "--reference-test-from-fix", str(upstream_patch), "--json"]
     if reference_name is not None:
@@ -430,6 +548,14 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
         report = extract_json(verify.stdout)
     except ValueError as exc:
         raise CaseExecutionError("parse", "no valid verifier result") from exc
+    reference_lines.pop((case_id, agent_id), None)
+    reported = report.get("reference_test")
+    if unity and isinstance(reported, dict) and reported.get("granularity") != case.get("bug_test_granularity"):
+        raise CaseExecutionError("verify", "cplus reported a different reference granularity than case.yaml")
+    if unity and isinstance(reported, dict):
+        line = public_reference_line(reported.get("description"))
+        if line is not None:
+            reference_lines[(case_id, agent_id)] = line
     verdict = report.get("verdict")
     infrastructure = report.get("infrastructure_error")
     if infrastructure:
@@ -476,6 +602,8 @@ def main() -> int:
     checked_at_utc = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     for case_id, agent_id in selected_pairs():
         agent_name, agent_version = "not recorded", "not recorded"
+        revision = case_revision_or_legacy(case_id)
+        reference_lines.pop((case_id, agent_id), None)
         result_note = None
         input_note = None
         attempt_note = None
@@ -498,7 +626,8 @@ def main() -> int:
         result.parent.mkdir(parents=True, exist_ok=True)
         result.write_text(
             render(case_id, verdict, gates, seconds, agent_name, agent_version, checked_at_utc,
-                   reason, result_note, patch_digest(case_id, agent_id), input_note, attempt_note, network_note),
+                   reason, result_note, patch_digest(case_id, agent_id), input_note, attempt_note, network_note,
+                   revision, reference_lines.get((case_id, agent_id))),
             encoding="utf-8",
         )
         label = f"{verdict} - no agent fix yet" if verdict == "PENDING" else verdict
@@ -510,6 +639,9 @@ if __name__ == "__main__":
     if sys.argv[1:] == ["--has-patches"]:
         print("true" if any((ROOT / "cases" / case_id / "agents" / agent_id / "agent-fix.patch").read_bytes().strip()
                             for case_id, agent_id in selected_pairs()) else "false")
+    elif sys.argv[1:] == ["--revisions"]:
+        # the cplus revisions the selected pairs need, for scripts/install_private.sh (one per case, deduplicated)
+        print(" ".join(sorted({case_revision_or_legacy(case_id) for case_id, _ in selected_pairs()})))
     elif sys.argv[1:] == ["--list-pairs"]:
         for case_id, agent_id in selected_pairs():
             print(f"{case_id}/{agent_id}")

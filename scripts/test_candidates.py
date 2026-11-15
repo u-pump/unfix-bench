@@ -98,6 +98,10 @@ class CaseRulesTest(Fixture):
         self.candidate(copy.deepcopy(CASE) | changes)
         return self.problems()
 
+    def test_verifier_revision_is_optional_but_must_be_a_full_commit(self) -> None:
+        self.assertEqual(self.broken(verifier_revision="77c7df19b63efbf7f96a8c0d9451698ba9c14e15"), [])
+        self.assertTrue(any("verifier_revision" in p for p in self.broken(verifier_revision="77c7df1")))
+
     def test_owner_only_fields_are_refused(self) -> None:
         for field in ("agent_input_repo", "input_sha256"):
             with self.subTest(field):
