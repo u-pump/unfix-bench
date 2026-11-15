@@ -2,9 +2,14 @@
 # Copyright (c) 2026 U-Pump
 name: Mine candidates
 
-# Owner-triggered. BENCH-20 miner. This file is the skeleton: only the discover job exists (GitHub reads,
-# no clone, no build, no secrets, read-only token). The baseline, collect and record jobs are added in the
-# next pull requests. See docs/plans/bench-20-miner.md section 5.
+# Owner-triggered. BENCH-20 miner. See docs/plans/bench-20-miner.md section 5.
+#   discover  GitHub reads only: no clone, no build, no secrets, read-only token.
+#   image     builds docker/miner-build, saves it as an artifact. Nothing is pushed to a registry.
+#   baseline  other people's code: clone with network, then build and test in the image with --network none.
+#             No secrets, read-only token. Uploads only result.json and baseline.log after a policy check.
+#   collect   checks the artifacts again and merges them. No foreign code runs here.
+#   record    the only job with write access. Runs this repository's scripts on checked files and opens a pull
+#             request with candidates/. It has no access to bench-in-* inputs or agent keys.
 on:
   workflow_dispatch:
     inputs:
@@ -48,6 +53,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    outputs:
+      indices: ${{ steps.matrix.outputs.indices }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -71,9 +78,182 @@ jobs:
                 --out "$RUNNER_TEMP/discover/discovered.json")
           if [ -n "$INPUT_PRS" ]; then args+=(--prs "$INPUT_PRS"); fi
           PYTHONPATH=scripts python scripts/mine/discover.py "${args[@]}"
+      - name: List the candidates to baseline
+        id: matrix
+        run: |
+          echo "indices=$(PYTHONPATH=scripts python scripts/mine/record.py matrix "$RUNNER_TEMP/discover/discovered.json")" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: discovered
           path: ${{ runner.temp }}/discover/discovered.json
           if-no-files-found: error
           retention-days: 3
+
+  image:
+    needs: discover
+    if: ${{ needs.discover.outputs.indices != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      # Layer cache in the Actions cache: the first-party cache action, no extra permission, no registry.
+      - uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ${{ runner.temp }}/buildx-cache
+          key: miner-build-${{ hashFiles('docker/miner-build/Dockerfile') }}
+          restore-keys: miner-build-
+      - name: Build the image
+        run: |
+          docker buildx create --name miner --driver docker-container --use
+          docker buildx build --load --tag unfix-bench-miner-build:ci \
+            --cache-from "type=local,src=$RUNNER_TEMP/buildx-cache" \
+            --cache-to "type=local,dest=$RUNNER_TEMP/buildx-cache-new,mode=max" \
+            docker/miner-build
+          rm -rf "$RUNNER_TEMP/buildx-cache"
+          mv "$RUNNER_TEMP/buildx-cache-new" "$RUNNER_TEMP/buildx-cache"
+      - name: Prove the image runs without network and save it
+        run: |
+          mkdir -p "$RUNNER_TEMP/image"
+          docker run --rm --network none unfix-bench-miner-build:ci bash -c 'cmake --version | head -n1; gcc --version | head -n1; ruby --version'
+          if docker run --rm --network none unfix-bench-miner-build:ci getent hosts github.com; then echo "network is reachable"; exit 1; fi
+          docker image inspect --format '{{.Id}}' unfix-bench-miner-build:ci > "$RUNNER_TEMP/image/image-id"
+          docker save unfix-bench-miner-build:ci | gzip -1 > "$RUNNER_TEMP/image/image.tar.gz"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: miner-image
+          path: ${{ runner.temp }}/image/
+          if-no-files-found: error
+          retention-days: 1
+
+  baseline:
+    needs: [discover, image]
+    if: ${{ needs.discover.outputs.indices != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        index: ${{ fromJSON(needs.discover.outputs.indices) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: discovered
+          path: ${{ runner.temp }}/discover
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: miner-image
+          path: ${{ runner.temp }}/image
+      - name: Load the image and check it is the one that was built
+        run: |
+          gunzip -c "$RUNNER_TEMP/image/image.tar.gz" | docker load
+          test "$(docker image inspect --format '{{.Id}}' unfix-bench-miner-build:ci)" = "$(cat "$RUNNER_TEMP/image/image-id")"
+      - name: Clone with network, build and test without
+        env:
+          INDEX: ${{ matrix.index }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          PYTHONPATH=scripts python scripts/mine/baseline.py --discovered "$RUNNER_TEMP/discover/discovered.json" \
+            --index "$INDEX" --image unfix-bench-miner-build:ci --run-url "$RUN_URL" \
+            --work "$RUNNER_TEMP/work" --out "$RUNNER_TEMP/out/baseline-$INDEX"
+      - name: Check the artifact policy before upload
+        id: policy
+        run: PYTHONPATH=scripts python scripts/mine/artifacts.py "$RUNNER_TEMP/out"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ steps.policy.outcome == 'success' }}
+        with:
+          name: baseline-${{ matrix.index }}
+          path: ${{ runner.temp }}/out/baseline-${{ matrix.index }}
+          if-no-files-found: error
+          retention-days: 3
+
+  collect:
+    needs: [discover, baseline]
+    if: ${{ always() && needs.discover.result == 'success' && needs.discover.outputs.indices != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        continue-on-error: true
+        with:
+          pattern: baseline-*
+          path: ${{ runner.temp }}/collected
+      - name: Check the artifact policy again
+        run: |
+          mkdir -p "$RUNNER_TEMP/collected"
+          PYTHONPATH=scripts python scripts/mine/artifacts.py "$RUNNER_TEMP/collected"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: collected
+          path: ${{ runner.temp }}/collected/
+          if-no-files-found: ignore
+          retention-days: 3
+
+  record:
+    needs: [discover, collect]
+    if: ${{ always() && needs.discover.result == 'success' && github.actor == 'u-pump' && needs.collect.result != 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: discovered
+          path: ${{ runner.temp }}/discover
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        continue-on-error: true
+        with:
+          name: collected
+          path: ${{ runner.temp }}/collected
+      - name: Write drafts and the rejection log
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/collected"
+          PYTHONPATH=scripts python scripts/mine/artifacts.py "$RUNNER_TEMP/collected"
+          PYTHONPATH=scripts python scripts/mine/record.py apply --discovered "$RUNNER_TEMP/discover/discovered.json" \
+            --collected "$RUNNER_TEMP/collected" --run-url "$RUN_URL"
+      - name: Open a pull request for the owner to review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          branch="mine-candidates-${GITHUB_RUN_ID}"
+          git add -A candidates
+          if git diff --cached --quiet; then echo "Nothing to record"; exit 0; fi
+          git -c user.name='unfix-bench-bot' -c user.email='unfix-bench-bot@users.noreply.github.com' \
+            commit -qm "Mined candidates from run ${GITHUB_RUN_ID}"
+          git push -q origin "HEAD:refs/heads/${branch}"
+          {
+            echo "Drafts and rejection-log rows from the [miner run](${RUN_URL}); the summary is in candidates/_runs/${GITHUB_RUN_ID}/summary.json."
+            echo
+            echo "Nothing here is a case. Review each draft (the issue text still holds the upstream description and its hints), then move it to cases/ by hand following candidates/README.md."
+          } > "$RUNNER_TEMP/body.md"
+          gh pr create --base main --head "$branch" --title "Mined candidates (run ${GITHUB_RUN_ID})" --body-file "$RUNNER_TEMP/body.md"

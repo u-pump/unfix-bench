@@ -10,6 +10,8 @@ candidates/<id>/baseline.log  three runs on the base (fail) and three with the f
 candidates/_rejected/*.jsonl  append-only log of rejected candidates, one JSON object per line, with a reason code
 ```
 
+Drafts are produced by the `Mine candidates` workflow (manual run, owner only): `discover` (GitHub reads) -> `image` (builds `docker/miner-build`, no registry) -> `baseline` (clone with network, build and test in the image with `--network none`) -> `collect` (artifact policy) -> `record` (opens a pull request with `candidates/`). Only `record` can write; nothing is moved to `cases/` automatically, and `ISSUE.md` still holds the upstream text with its hints until the owner edits it.
+
 Check the shape with `python scripts/candidates.py check`.
 
 ## Checklist: moving a candidate from `candidates/` to `cases/` (owner)
