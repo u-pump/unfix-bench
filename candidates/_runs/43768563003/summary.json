@@ -1,0 +1,19 @@
+{
+  "errors": [],
+  "missing_results": [],
+  "rejected_logged": 93,
+  "run": "https://github.com/u-pump/unfix-bench/actions/runs/43768563003",
+  "source": "freertos",
+  "stats": {
+    "accepted": 10,
+    "deferred": 6,
+    "looked_at": 99,
+    "rejected": {
+      "duplicate_backport": 11,
+      "no_test_in_diff": 69,
+      "test_only_fix": 3
+    },
+    "skipped": 0
+  },
+  "written": []
+}
