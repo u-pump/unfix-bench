@@ -170,11 +170,17 @@ def discover(client: Client, *, source: str, miner_run: str, root: Path, repos: 
     """
     if source not in candidates.SOURCES:
         raise ValueError(f"unknown source {source!r}")
+    known: list[tuple[str, int]] = []
     if refs is None:
         names = repos if repos is not None else list(SOURCE_REPOS.get(source, ()))
         if not names:
             raise ValueError(f"source {source!r} has no repositories; pass repos or refs")
         refs = [(repo, number) for repo in names for number in search_merged(client, repo, since, max_prs, query)]
+        # Candidates the log already rejected for a reason about the candidate are not looked at again. Build-stage
+        # rejections are about the recipe and are not final, so a newer miner version judges those again.
+        final = rejects.final_refs(root, source)
+        known = [(repo, number) for repo, number in refs if (repo, f"pull/{number}") in final]
+        refs = [pair for pair in refs if pair not in known]
     infos: dict[str, dict[str, Any]] = {}
     passed: list[dict[str, Any]] = []
     rows: list[dict[str, Any]] = []
@@ -199,7 +205,7 @@ def discover(client: Client, *, source: str, miner_run: str, root: Path, repos: 
         accepted = accepted[:max_accepted]
     return {"source": source, "miner_run": miner_run, "accepted": accepted, "rejected": rows, "skipped": skipped,
             "stats": {"looked_at": len(refs), "accepted": len(accepted), "rejected": rejects.summary(rows),
-                      "skipped": len(skipped), "deferred": deferred}}
+                      "skipped": len(skipped), "deferred": deferred, "already_rejected": len(known)}}
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -44,19 +44,39 @@ def read(root: Path, source: str) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-def append(root: Path, row: dict[str, Any]) -> bool:
+def reevaluable(row: dict[str, Any]) -> bool:
+    """Whether a newer miner version may judge this candidate again.
+
+    A build-stage rejection (the recipe could not build it, ran out of time, or needed the network) says
+    something about the miner's recipe and image, not about the candidate. A ``build_failed`` found while
+    reading the test results is the same kind. Every other rejection is about the candidate itself.
+    """
+    return row["stage"] == "build" or row["reason_code"] == "build_failed"
+
+
+def final_refs(root: Path, source: str) -> set[tuple[str, str]]:
+    """``(project, ref)`` with at least one rejection that is not re-evaluable: discovery may skip these."""
+    return {(row["project"], row["ref"]) for row in read(root, source) if not reevaluable(row)}
+
+
+def append(root: Path, row: dict[str, Any], miner_version: str | None = None) -> bool:
     """Append one row; returns False (and writes nothing) when the same decision is already logged.
 
-    Existing lines are never rewritten. The same (project, ref, stage, reason_code) is logged once, so a
-    repeated mining run does not grow the log.
+    Existing lines are never rewritten. The same (project, ref, stage, reason_code, miner_version) is logged
+    once, so a repeated run of one miner version does not grow the log, while a re-evaluation by a newer
+    version adds its own line next to the old one (the old line stays as history). ``miner_version`` is
+    stamped on the row when given.
     """
+    if miner_version is not None:
+        row = {**row, "miner_version": miner_version}
     problems = candidates.Problems()
     candidates.validate_rejection(row, "rejection", problems)
     if problems:
         raise RejectionError("; ".join(problems))
     path = _log_path(root, row["source"])
-    key = (row["project"], row["ref"], row["stage"], row["reason_code"])
-    if any((old["project"], old["ref"], old["stage"], old["reason_code"]) == key for old in read(root, row["source"])):
+    key = (row["project"], row["ref"], row["stage"], row["reason_code"], row.get("miner_version"))
+    if any((old["project"], old["ref"], old["stage"], old["reason_code"], old.get("miner_version")) == key
+           for old in read(root, row["source"])):
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
     needs_break = path.is_file() and path.stat().st_size > 0 and not path.read_bytes().endswith(b"\n")

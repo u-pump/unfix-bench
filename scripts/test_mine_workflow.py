@@ -130,6 +130,18 @@ class DockerfileTest(unittest.TestCase):
         digest = re.search(r"sha256:[0-9a-f]{64}", self.TEXT).group(0)  # type: ignore[union-attr]
         self.assertIn(digest, agent)
 
+    def test_the_image_holds_what_the_recipes_need_at_pinned_versions(self) -> None:
+        self.assertRegex(self.TEXT, r"(?m)^ARG UNIFDEF_VERSION=\d+\.\d+-\d+$")
+        self.assertRegex(self.TEXT, r"(?m)^\s+ca-certificates .* unifdef \\$")  # unifdefall: FreeRTOS-Plus-TCP unit tests
+        self.assertIn('check unifdef "$(dpkg-query', self.TEXT)
+        self.assertIn("ninja-build", self.TEXT)  # FreeRTOS-Plus-TCP builds with Ninja
+
+    def test_the_recipes_come_from_the_repository_not_from_the_workflow(self) -> None:
+        # the baseline step passes no build options: baseline.py picks the recipe by project (scripts/mine/recipes.py)
+        block = job("baseline")
+        self.assertNotIn("--option", block)
+        self.assertNotIn("--cmake-dir", block)
+
     def test_the_image_holds_ruby_for_unity_and_no_agent_or_secret(self) -> None:
         self.assertIn("ruby", self.TEXT)
         code = chr(10).join(line for line in self.TEXT.splitlines() if not line.startswith("#"))

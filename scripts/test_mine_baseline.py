@@ -282,6 +282,59 @@ class PipelineTest(unittest.TestCase):
                 "fix_date": "2026-08-06", "files": ["src/lib.c", "test/unit-test/lib_utest.c", "test/unit-test/CMakeLists.txt"]}
         return baseline.run_baseline(item, Path(tmp) / "work", runner, miner_run=RUN, clone_url=str(repo))
 
+    def test_submodule_with_update_none_is_really_checked_out(self) -> None:
+        # The FreeRTOS repositories set "update = none" in .gitmodules; a plain "git submodule update --init" skips them.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo, _ = make_repo(root)
+            dep = root / "dep"
+            dep.mkdir()
+            subprocess.run(["git", "init", "-q", "-b", "main", str(dep)], check=True)
+            (dep / "unity.c").write_text("/* dependency */" + chr(10))
+            sh(dep, "add", "-A")
+            sh(dep, "commit", "-q", "-m", "dep")
+            sh(repo, "-c", "protocol.file.allow=always", "submodule", "add", "-q", str(dep), "deps/dep")
+            sh(repo, "config", "-f", ".gitmodules", "submodule.deps/dep.update", "none")
+            sh(repo, "add", "-A")
+            sh(repo, "commit", "-q", "-m", "pin the dependency")
+            (repo / "src" / "lib.c").write_text("int f(void) { return 2; }" + chr(10))
+            sh(repo, "commit", "-q", "-am", "fix")
+            fix = sh(repo, "rev-parse", "HEAD")
+            pin = baseline.gitlinks(repo, fix)["deps/dep"]
+            item = {"source": "freertos", "project": "FreeRTOS/coreMQTT", "ref": "pull/1", "fix_commit": fix,
+                    "fix_date": "2026-08-06", "files": ["src/lib.c"]}
+            # premise: without --checkout the module stays empty
+            plain = root / "plain"
+            subprocess.run(["git", "clone", "-q", str(repo), str(plain)], check=True)
+            sh(plain, "-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive")
+            self.assertFalse((plain / "deps" / "dep" / "unity.c").exists())
+            # the miner's preparation checks it out on both sides, at the pinned commit
+            prepared = baseline.prepare(item, root / "work", str(repo), protocols=("file",))
+            for side in ("base_dir", "fix_dir"):
+                self.assertTrue((prepared[side] / "deps" / "dep" / "unity.c").is_file(), side)
+            self.assertEqual(prepared["submodules"], [{"path": "deps/dep", "commit": pin}])
+            self.assertEqual(sh(prepared["fix_dir"] / "deps" / "dep", "rev-parse", "HEAD"), pin)
+
+    def test_submodule_transfer_protocols_are_limited(self) -> None:
+        # .gitmodules belongs to the project being mined: with only https allowed a file:// URL must not be fetched
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo, _ = make_repo(root)
+            dep = root / "dep"
+            dep.mkdir()
+            subprocess.run(["git", "init", "-q", "-b", "main", str(dep)], check=True)
+            (dep / "x.c").write_text("x" + chr(10))
+            sh(dep, "add", "-A")
+            sh(dep, "commit", "-q", "-m", "dep")
+            sh(repo, "-c", "protocol.file.allow=always", "submodule", "add", "-q", str(dep), "deps/dep")
+            sh(repo, "commit", "-q", "-m", "pin")
+            (repo / "src" / "lib.c").write_text("int f(void) { return 2; }" + chr(10))
+            sh(repo, "commit", "-q", "-am", "fix")
+            item = {"source": "freertos", "project": "FreeRTOS/coreMQTT", "ref": "pull/1", "fix_commit": sh(repo, "rev-parse", "HEAD"),
+                    "fix_date": "2026-08-06", "files": ["src/lib.c"]}
+            with self.assertRaises(baseline.BaselineError):
+                baseline.prepare(item, root / "work", str(repo))
+
     def test_unknown_commit_is_an_infrastructure_error_not_a_rejection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo, _ = make_repo(Path(tmp))

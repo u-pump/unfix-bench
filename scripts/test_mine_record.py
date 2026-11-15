@@ -163,6 +163,7 @@ class RecordTest(unittest.TestCase):
             self.assertEqual((summary["written"], summary["rejected_logged"]), ([], 1))
             rows = rejects.read(env.root, "freertos")
             self.assertEqual((rows[0]["reason_code"], rows[0]["stage"], rows[0]["miner_run"]), ("noisy_module", "baseline", RUN))
+            self.assertEqual(rows[0]["miner_version"], record.MINER_VERSION)
             self.assertFalse((env.root / "candidates" / "coremqtt-383").exists())
 
     def test_a_forged_reason_code_cannot_enter_the_log(self) -> None:

@@ -12,6 +12,8 @@ candidates/_rejected/*.jsonl  append-only log of rejected candidates, one JSON o
 
 Drafts are produced by the `Mine candidates` workflow (manual run, owner only): `discover` (GitHub reads) -> `image` (builds `docker/miner-build`, no registry) -> `baseline` (clone with network, build and test in the image with `--network none`) -> `collect` (artifact policy) -> `record` (opens a pull request with `candidates/`). Only `record` can write; nothing is moved to `cases/` automatically, and `ISSUE.md` still holds the upstream text with its hints until the owner edits it.
 
+Rejection lines carry `miner_version`. A rejection at the `build` stage can be judged again by a newer miner version (it adds a new line, the old one stays); see "Re-evaluation by a newer miner version" in [docs/protocol.md](../docs/protocol.md).
+
 **Checks on the miner's pull request.** The pull request is created with the workflow's `GITHUB_TOKEN`, and GitHub does not start other workflows for events caused by that token, so `verify.yml` does not run on it by itself. What did run: `record.py apply` ends with `candidates.check_candidates` over the whole tree and fails the job if anything is malformed, so a pull request that exists already passed the `candidates/` shape check. If the checks are required for merging, the owner starts them by hand: push any commit to the branch `mine-candidates-<run id>` from their own account, or close and reopen the pull request (standard GitHub behaviour; not tried in this repository yet). The branch is protected by nothing else, so look at the diff before merging.
 
 Check the shape with `python scripts/candidates.py check`.
