@@ -162,10 +162,11 @@ def known_dedupe_keys(root: Path) -> set[str]:
 
 def discover(client: Client, *, source: str, miner_run: str, root: Path, repos: list[str] | None = None,
              refs: list[tuple[str, int]] | None = None, since: str = "2025-01-01", max_prs: int = 50,
-             query: str = "fix in:title") -> dict[str, Any]:
+             query: str = "fix in:title", max_accepted: int | None = None) -> dict[str, Any]:
     """Discovery for one source: ``{"accepted", "rejected", "skipped", "stats", ...}``.
 
     ``refs`` (an explicit list) replaces the search; otherwise up to ``max_prs`` merged pull requests per repository.
+    ``max_accepted`` keeps only the first N accepted items (the rest are counted in ``stats["deferred"]``, not rejected).
     """
     if source not in candidates.SOURCES:
         raise ValueError(f"unknown source {source!r}")
@@ -192,9 +193,13 @@ def discover(client: Client, *, source: str, miner_run: str, root: Path, repos: 
             passed.append(item)
     accepted, duplicates = dedupe(passed, known_dedupe_keys(root), miner_run)
     rows.extend(duplicates)
+    deferred = 0
+    if max_accepted is not None and len(accepted) > max_accepted:
+        deferred = len(accepted) - max_accepted
+        accepted = accepted[:max_accepted]
     return {"source": source, "miner_run": miner_run, "accepted": accepted, "rejected": rows, "skipped": skipped,
             "stats": {"looked_at": len(refs), "accepted": len(accepted), "rejected": rejects.summary(rows),
-                      "skipped": len(skipped)}}
+                      "skipped": len(skipped), "deferred": deferred}}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -206,6 +211,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--since", default="2025-01-01", help="merged on or after YYYY-MM-DD")
     parser.add_argument("--max-prs", type=int, default=50, help="pull requests looked at per repository")
     parser.add_argument("--query", default="fix in:title")
+    parser.add_argument("--max-candidates", type=int, default=None, help="keep at most this many accepted items")
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args(argv)
     if not candidates.RUN_URL.fullmatch(args.run_url):
@@ -219,7 +225,7 @@ def main(argv: list[str] | None = None) -> int:
         refs = parse_refs(args.prs) if args.prs.strip() else None
         result = discover(HttpClient(os.environ.get("GITHUB_TOKEN") or None), source=args.source,
                           miner_run=args.run_url, root=candidates.ROOT, repos=repos, refs=refs,
-                          since=args.since, max_prs=args.max_prs, query=args.query)
+                          since=args.since, max_prs=args.max_prs, query=args.query, max_accepted=args.max_candidates)
     except (GitHubError, ValueError) as error:
         print(f"discover: {error}", file=sys.stderr)
         return 1

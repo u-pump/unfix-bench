@@ -54,3 +54,9 @@ Agent patch files use Git's `-text` attribute so a Windows checkout cannot chang
 **Dates.** `fix_date` is recorded and `post_cutoff` marks fixes after 2026-06-30; at least half of the new cases should be post-cutoff and are shown separately. This is a date, not a statement about what any model has seen.
 
 **Fuzz origin** is recorded only when the commit or issue directly names a fuzzer or OSS-Fuzz.
+
+## Known issues and backlog
+
+Small open items that are not part of a numbered task. Fix each in its own PR.
+
+- **Four test modules do not import on a local Python 3.14 (Windows).** `test_collect_agent_run`, `test_metrics_and_notes`, `test_no_patch` and `test_verify_cases` fail at import with `AttributeError: module 'logging' has no attribute 'getLogger'` (raised inside the standard library's `concurrent.futures`, so something shadows `logging` on the path when the test runner is started from `scripts/`). They pass in CI (Python 3.12, Linux). The failure also occurs on a clean `main`. Cause **not established**; not fixed. Until then, run the other test modules locally and rely on CI for these four.

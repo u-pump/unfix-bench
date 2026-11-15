@@ -160,6 +160,11 @@ class DiscoverTest(unittest.TestCase):
             again = [rejects.append(Path(tmp), row) for row in result["rejected"]]
         self.assertEqual((first, again), ([True], [False]))
 
+    def test_max_candidates_defers_the_rest_without_rejecting_them(self) -> None:
+        result = self.run_discover(FakeClient(routes()), refs=[(MQTT, 383), (TCP, 1357)], max_accepted=1)
+        self.assertEqual(len(result["accepted"]), 1)
+        self.assertEqual((result["stats"]["accepted"], result["stats"]["deferred"], result["rejected"]), (1, 1, []))
+
     def test_unknown_source_is_an_error(self) -> None:
         with self.assertRaises(ValueError):
             discover.discover(FakeClient({}), source="nope", miner_run=RUN, root=Path("."), refs=[])

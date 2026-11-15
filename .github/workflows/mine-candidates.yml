@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 U-Pump
+name: Mine candidates
+
+# Owner-triggered. BENCH-20 miner. This file is the skeleton: only the discover job exists (GitHub reads,
+# no clone, no build, no secrets, read-only token). The baseline, collect and record jobs are added in the
+# next pull requests. See docs/plans/bench-20-miner.md section 5.
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'Source (freertos)'
+        required: true
+        type: choice
+        options:
+          - freertos
+      prs:
+        description: 'Explicit list owner/repo#N separated by commas (blank means search the source repositories)'
+        required: false
+        type: string
+      since:
+        description: 'Search: merged on or after YYYY-MM-DD'
+        required: false
+        default: '2025-01-01'
+        type: string
+      max_prs:
+        description: 'Search: pull requests looked at per repository'
+        required: false
+        default: '50'
+        type: string
+      max_candidates:
+        description: 'Keep at most this many accepted items for the next stage'
+        required: false
+        default: '10'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mine-candidates
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    if: ${{ github.actor == 'u-pump' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Discover
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          INPUT_SOURCE: ${{ inputs.source }}
+          INPUT_PRS: ${{ inputs.prs }}
+          INPUT_SINCE: ${{ inputs.since }}
+          INPUT_MAX_PRS: ${{ inputs.max_prs }}
+          INPUT_MAX_CANDIDATES: ${{ inputs.max_candidates }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/discover"
+          args=(--source "$INPUT_SOURCE" --run-url "$RUN_URL" --since "$INPUT_SINCE" \
+                --max-prs "$INPUT_MAX_PRS" --max-candidates "$INPUT_MAX_CANDIDATES" \
+                --out "$RUNNER_TEMP/discover/discovered.json")
+          if [ -n "$INPUT_PRS" ]; then args+=(--prs "$INPUT_PRS"); fi
+          PYTHONPATH=scripts python scripts/mine/discover.py "${args[@]}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: discovered
+          path: ${{ runner.temp }}/discover/discovered.json
+          if-no-files-found: error
+          retention-days: 3
