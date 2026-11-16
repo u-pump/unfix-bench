@@ -9,7 +9,7 @@
   "issue_url": "https://github.com/FreeRTOS/coreMQTT/pull/331",
   "fix_url": "https://github.com/FreeRTOS/coreMQTT/commit/08510aa48f73a20a217245459c87ce94348684aa",
   "license": "MIT",
-  "category": "unclassified (the owner sets it)",
+  "category": "protocol conformance",
   "build": "cmake -S test -B build -DCMAKE_BUILD_TYPE=Debug -DUNITTEST=1 -DCMAKE_C_FLAGS=--coverage -DBUILD_CLONE_SUBMODULES=OFF && cmake --build build -j2",
   "test": "ctest --test-dir build -R '^core_mqtt_serializer_utest$' --output-on-failure",
   "bug_test_granularity": "ctest_module",

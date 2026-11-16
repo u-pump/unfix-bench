@@ -1,27 +1,8 @@
-<!-- DRAFT. This is the text of the upstream pull request, which describes the fix. The owner removes every solution hint before this becomes an issue; nothing was removed automatically. -->
+# MQTT_GetConnectPacketSize() rejects a CONNECT with a zero-length client identifier
 
-# fix: support zero-length clientId
+MQTT 3.1.1 (section 3.1.3.1) allows a client to send a zero-length ClientId, provided CleanSession is set to 1. coreMQTT rejects it: MQTT_GetConnectPacketSize() returns MQTTBadParameter when clientIdentifierLength is 0, so a client cannot connect with a server-assigned identifier.
 
-Source: https://github.com/FreeRTOS/coreMQTT/pull/331
-
-<!--- Title -->
-
-Description
------------
-<!--- Describe your changes in detail. -->
-
-Test Steps
------------
-<!-- Describe the steps to reproduce. -->
-
-Checklist:
-----------
-<!--- Go over all the following points, and put an `x` in all the boxes that apply. -->
-<!--- If you're unsure about any of these, don't hesitate to ask. We're here to help! -->
-- [ ] I have tested my changes. No regression in existing tests.
-- [ ] I have modified and/or added unit-tests to cover the code changes in this Pull Request.
-
-Related Issue
------------
-<!-- If any, please provide issue ID. -->
-By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.
+Expected:
+- clientIdentifierLength == 0 with cleanSession == true is accepted (pClientIdentifier may be NULL or "").
+- clientIdentifierLength == 0 with cleanSession == false is rejected with MQTTBadParameter (the spec requires CleanSession=1).
+- A client identifier whose length and value disagree (NULL or "" with a non-zero length) is rejected with MQTTBadParameter.

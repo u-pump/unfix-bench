@@ -205,6 +205,12 @@ class RejectionLogTest(Fixture):
                      "duplicate_backport", "test_not_selectable"):
             self.assertIn(code, candidates.REJECT_CODES)
 
+    def test_the_owner_can_reject_a_draft_as_not_a_behavior_bug(self) -> None:
+        owner = REJECT | {"stage": "owner_review", "reason_code": "not_a_behavior_bug"}
+        self.assertEqual(self.log(owner), [])
+        self.assertIn("not_a_behavior_bug", candidates.REJECT_CODES)
+        self.assertIn("owner_review", candidates.REJECT_STAGES)
+
     def test_fields_are_exact_and_lines_parse(self) -> None:
         extra = dict(REJECT, note="x")
         self.assertTrue(any("exactly" in p for p in self.log(extra)))
