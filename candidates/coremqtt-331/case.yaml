@@ -1,0 +1,29 @@
+{
+  "id": "coremqtt-331",
+  "repo": "https://github.com/FreeRTOS/coreMQTT.git",
+  "base": "ad72f6aff6c08ac7fe91d7aac0ea6b046b52cd94",
+  "upstream_fix": "08510aa48f73a20a217245459c87ce94348684aa",
+  "bug_test": "test_MQTT_GetConnectPacketSize",
+  "reference_selection": "first function added or changed by the upstream diff that fails 3/3 on the base; the reference is the whole ctest test core_mqtt_serializer_utest (ctest_module), no function filter exists",
+  "reference_selection_note": "ctest test core_mqtt_serializer_utest; changed functions: test_MQTT_GetConnectPacketSize",
+  "issue_url": "https://github.com/FreeRTOS/coreMQTT/pull/331",
+  "fix_url": "https://github.com/FreeRTOS/coreMQTT/commit/08510aa48f73a20a217245459c87ce94348684aa",
+  "license": "MIT",
+  "category": "unclassified (the owner sets it)",
+  "build": "cmake -S test -B build -DCMAKE_BUILD_TYPE=Debug -DUNITTEST=1 -DCMAKE_C_FLAGS=--coverage -DBUILD_CLONE_SUBMODULES=OFF && cmake --build build -j2",
+  "test": "ctest --test-dir build -R '^core_mqtt_serializer_utest$' --output-on-failure",
+  "bug_test_granularity": "ctest_module",
+  "build_network": "none",
+  "module_other_tests": "3/3 pass",
+  "submodules": [
+    {
+      "commit": "afa294982e8a28bc06f341cc77fd4276641b42bd",
+      "path": "test/unit-test/CMock"
+    }
+  ],
+  "baseline_reproduction": {
+    "verdict": "REPRODUCED",
+    "runs": "3/3",
+    "elapsed_s": 11.6
+  }
+}

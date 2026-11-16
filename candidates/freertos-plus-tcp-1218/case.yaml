@@ -1,0 +1,33 @@
+{
+  "id": "freertos-plus-tcp-1218",
+  "repo": "https://github.com/FreeRTOS/FreeRTOS-Plus-TCP.git",
+  "base": "df252262e1cd24c7b65518e30e136fced5f90353",
+  "upstream_fix": "527a7c9ad9b23792c0ba04aa06c82d77661c6550",
+  "bug_test": "test_xDNSDoCallback_success_not_equal_identifier",
+  "reference_selection": "first function added or changed by the upstream diff that fails 3/3 on the base; the reference is the whole ctest test FreeRTOS_DNS_Callback_utest (ctest_module), no function filter exists",
+  "reference_selection_note": "ctest test FreeRTOS_DNS_Callback_utest; changed functions: test_xDNSDoCallback_success_not_equal_identifier, test_xDNSDoCallback_success_equal_identifier, test_xDNSDoCallback_success_equal_identifier_set_timer, test_xDNSDoCallback_success_equal_port_number_equal_name, test_xDNSDoCallback_fail_equal_port_number_not_equal_name, test_vDNSCheckCallback_success_search_id_not_null, test_vDNSCheckCallback_success_search_id_not_null_list_empty, test_vDNSCheckCallback_success_search_id_null, test_vDNSCheckCallback_success_search_id_null_timeout, test_vDNSCheckCallback_success_search_id_null_timeout_IPv6, test_vDNSCheckCallback_success_search_id_null_timeout2, test_vDNSCheckCallback_success_search_id_null_timeout2_IPv6, test_vSocketSelect_UDPSocketsOnly, test_vSocketSelect_TCPSocketsOnly, test_vSocketSelect_NoSocketsAtAll, test_vSocketBind_GotNULLItem, test_vSocketBind_GotANonNULLValue, test_vSocketBind_TCPGotAProperValuePortZero, test_vSocketClose_TCP_EverythingNonNULL, test_vSocketClose_TCP_LastAckMessageNonNULL, test_vSocketClose_TCP_AllFieldsNonNULL, test_prvTCPSetSocketCount_ListeningSocketNoChildren, test_prvTCPSetSocketCount_ListeningSocketNonZeroChildren1, test_prvTCPSetSocketCount_ListeningSocketNonZeroChildren2, test_prvTCPSetSocketCount_ListeningSocketNonZeroChildren3, test_prvTCPSetSocketCount_ListeningSocketNonZeroChildren4, test_prvTCPSetSocketCount_ListeningSock_HappyPath1, test_prvTCPSetSocketCount_ListeningSock_HappyPath2, test_prvTCPSetSocketCount_ListeningSock_HappyPath3, test_prvTCPSetSocketCount_NotListeningSock_1, test_prvTCPSetSocketCount_NotListeningSock_2, test_prvTCPSetSocketCount_NotListeningSock_3, test_prvTCPSetSocketCount_NotListeningSock_HappyPath, test_prvGetPrivatePortNumber_TCP_Found, test_prvGetPrivatePortNumber_UDP_Found, test_prvGetPrivatePortNumber_UDP_NotFoundAfterAllIterations, test_pxListFindListItemWithValue_ListLengthZero, test_pxListFindListItemWithValue_NotFound, test_pxListFindListItemWithValue_Found, test_pxTCPSocketLookup_FoundAMatch, test_pxTCPSocketLookup_NoMatch, test_pxTCPSocketLookup_NoMatch2, test_pxTCPSocketLookup_FoundAPartialMatch, test_pxTCPSocketLookup_IPv6Match",
+  "issue_url": "https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/pull/1218",
+  "fix_url": "https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/commit/527a7c9ad9b23792c0ba04aa06c82d77661c6550",
+  "license": "MIT",
+  "category": "unclassified (the owner sets it)",
+  "build": "cmake -S test/unit-test -B build -G Ninja -DBUILD_CLONE_SUBMODULES=OFF && cmake --build build -j2",
+  "test": "ctest --test-dir build -R '^FreeRTOS_DNS_Callback_utest$' --output-on-failure",
+  "bug_test_granularity": "ctest_module",
+  "build_network": "none",
+  "module_other_tests": "3/3 pass",
+  "submodules": [
+    {
+      "commit": "dbf70559b27d39c1fdb68dfb9a32140b6a6777a0",
+      "path": "test/FreeRTOS-Kernel"
+    },
+    {
+      "commit": "afa294982e8a28bc06f341cc77fd4276641b42bd",
+      "path": "tools/CMock"
+    }
+  ],
+  "baseline_reproduction": {
+    "verdict": "REPRODUCED",
+    "runs": "3/3",
+    "elapsed_s": 247.9
+  }
+}
