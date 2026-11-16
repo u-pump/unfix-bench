@@ -87,6 +87,7 @@ The focused command above runs the selected `bug_test`; the CTest command runs t
 - Ten cases is a small sample; seven are from fmt.
 - In fmt-4960, the reference test was chosen after the agent run. The selection rule was applied retrospectively and documented in [the case file](cases/fmt-4960/case.yaml); the patch was never edited.
 - The verifier is not open source yet. Public reports contain the verdict, eight check statuses, and elapsed time.
+- Each result names the verifier revision it was made with (the `Verifier:` line). All 20 results of the first ten cases were made with `81c0fda` and are not re-checked; cases added later are pinned to a newer revision, shown in their own results.
 - One attempt per agent and case measures that attempt, not a success rate; the conditions of the two agents differ in the ways listed in the [protocol](docs/protocol.md#conditions-codex-cli-and-claude-code).
 
 ## Found a wrong verdict?

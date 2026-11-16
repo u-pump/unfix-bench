@@ -197,7 +197,11 @@ jobs:
         if: steps.place.outputs.has_patch == 'true'
         env:
           CPLUS_READ_TOKEN: ${{ secrets.CPLUS_READ_TOKEN }}
-        run: bash scripts/install_private.sh
+          SELECT_CASE: ${{ matrix.case }}
+          SELECT_AGENT: claude-code
+        run: |
+          read -r -a revisions <<< "$(python scripts/verify_cases.py --revisions)"
+          bash scripts/install_private.sh "${revisions[@]}"
       - name: Verify with the same verifier as every other agent
         if: steps.place.outputs.recorded == 'true'
         env:

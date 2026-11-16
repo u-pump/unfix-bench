@@ -21,7 +21,7 @@ from typing import Any
 import candidates
 from mine import cap, rejects
 
-MINER_VERSION = "bench-20-pr6a"
+MINER_VERSION = "bench-20-pr6"
 MAX_LOG_BYTES = 200_000
 MODULE = re.compile(r"[\w.+-]{1,120}")
 FUNCTION = re.compile(r"test_\w{1,120}")
@@ -103,6 +103,7 @@ def draft(root: Path, item: dict[str, Any], result: dict[str, Any], log: str, ru
         "test": f"ctest --test-dir build -R {shlex.quote('^' + ctest_regex(module) + '$')} --output-on-failure",
         "bug_test_granularity": "ctest_module",
         "build_network": "none",
+        "verifier_revision": candidates.VERIFIER_FOR_NEW_CASES,
         "module_other_tests": "3/3 pass",
         "submodules": result["submodules"],
         "baseline_reproduction": {"verdict": "REPRODUCED", "runs": "3/3", "elapsed_s": result["elapsed_s"]},
