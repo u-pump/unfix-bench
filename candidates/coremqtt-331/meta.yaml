@@ -1,0 +1,11 @@
+{
+  "source": "freertos",
+  "spdx": "MIT",
+  "fix_date": "2025-10-30",
+  "post_cutoff": false,
+  "upstream_pr": "https://github.com/FreeRTOS/coreMQTT/pull/331",
+  "fuzz_origin": null,
+  "dedupe_key": "FreeRTOS/coreMQTT:fix-support-zero-length-clientid",
+  "mined_run_url": "https://github.com/u-pump/unfix-bench/actions/runs/43776205763",
+  "miner_version": "bench-20-pr6a"
+}

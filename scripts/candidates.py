@@ -30,12 +30,13 @@ SPDX_ALLOWLIST = frozenset({
 })
 GRANULARITIES = ("function", "ctest_module")
 SOURCES = ("freertos", "mbedtls", "zephyr", "nuttx", "littlefs", "lwip", "betaflight", "other")
-REJECT_STAGES = ("discover", "static", "build", "baseline", "fix_run", "license", "issue", "cap")
+REJECT_STAGES = ("discover", "static", "build", "baseline", "fix_run", "license", "issue", "cap",
+                 "owner_review")
 REJECT_CODES = (
     "no_test_in_diff", "test_only_fix", "duplicate_backport", "base_not_failing_3of3",
     "fix_not_passing_3of3", "build_failed", "over_30_min", "needs_hardware",
     "needs_network_dependency", "noisy_module", "test_not_selectable", "unsupported_by_verifier",
-    "license_unclear", "no_issue_text", "project_cap",
+    "license_unclear", "no_issue_text", "project_cap", "not_a_behavior_bug",
 )
 
 SHA = re.compile(r"[0-9a-f]{40}")

@@ -1,0 +1,13 @@
+=== base: build exit 0
+=== base run 1: 3 ctest tests, failed: core_mqtt_serializer_utest
+    core_mqtt_serializer_utest: failing functions: test_MQTT_GetConnectPacketSize
+=== base run 2: 3 ctest tests, failed: core_mqtt_serializer_utest
+    core_mqtt_serializer_utest: failing functions: test_MQTT_GetConnectPacketSize
+=== base run 3: 3 ctest tests, failed: core_mqtt_serializer_utest
+    core_mqtt_serializer_utest: failing functions: test_MQTT_GetConnectPacketSize
+=== fix: build exit 0
+=== fix run 1: 3 ctest tests, failed: none
+=== fix run 2: 3 ctest tests, failed: none
+=== fix run 3: 3 ctest tests, failed: none
+=== verdict: {"accepted": true, "bug_test": "test_MQTT_GetConnectPacketSize", "bug_test_granularity": "ctest_module", "module": "core_mqtt_serializer_utest", "module_other_tests": "3/3 pass", "reference_functions": ["test_MQTT_GetConnectPacketSize"]}
+=== elapsed 11.6s

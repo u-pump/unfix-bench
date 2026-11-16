@@ -106,7 +106,8 @@ class ReevaluationTest(unittest.TestCase):
         self.assertTrue(rejects.reevaluable(row(stage="baseline", reason_code="build_failed")))
         for code, stage in (("noisy_module", "baseline"), ("base_not_failing_3of3", "baseline"),
                             ("fix_not_passing_3of3", "fix_run"), ("duplicate_backport", "static"),
-                            ("test_only_fix", "static"), ("project_cap", "cap")):
+                            ("test_only_fix", "static"), ("project_cap", "cap"),
+                            ("not_a_behavior_bug", "owner_review")):
             self.assertFalse(rejects.reevaluable(row(stage=stage, reason_code=code)), code)
 
     def test_a_newer_version_adds_its_own_line_and_the_old_one_stays(self) -> None:
