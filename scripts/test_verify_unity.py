@@ -91,11 +91,17 @@ def run_main(root: Path, fake: Cplus, **env: str) -> str:
 
 class RevisionPerCaseTest(unittest.TestCase):
     def test_the_published_cases_stay_on_their_revision(self) -> None:
+        legacy_ids = set()
         for folder in sorted((ROOT / "cases").iterdir()):
             case = json.loads((folder / "case.yaml").read_text(encoding="utf-8"))
-            self.assertNotIn("verifier_revision", case, folder.name)
+            if "verifier_revision" in case:  # a mined case (BENCH-20) names its own full revision
+                self.assertRegex(case["verifier_revision"], r"^[0-9a-f]{40}$", folder.name)
+                self.assertEqual(verify_cases.case_revision(folder.name), case["verifier_revision"], folder.name)
+                continue
+            legacy_ids.add(folder.name)
             self.assertEqual(verify_cases.case_revision(folder.name), LEGACY, folder.name)
-        reports = sorted((ROOT / "results").glob("*/*.md"))
+        self.assertEqual(len(legacy_ids), 10)
+        reports = sorted(p for p in (ROOT / "results").glob("*/*.md") if p.parent.name in legacy_ids)
         self.assertTrue(reports)
         for path in reports:
             self.assertRegex(path.read_text(encoding="utf-8"), rf"(?m)^Verifier: cplus {LEGACY} ·", path.as_posix())

@@ -1,6 +1,10 @@
 {
   "note": "HEAD commit of each private u-pump/bench-in-<id> repository, the agent input Codex CLI received. No repository was pushed after the date of its Codex run; for cpp-peglib-121, fmt-4800 and spdlog-3049 the push and the run are on the same day, so their order cannot be shown. See docs/DECISIONS.md, BENCH-13.",
   "inputs": {
+    "coremqtt-331": {
+      "commit": "aaf83f52ca155b985be017c8722b5f0419e1af36",
+      "tree": "beb6df229ba7c65f8bd17c8399adc30207da6546"
+    },
     "cpp-peglib-121": {
       "commit": "fcaa1b0f50df505fd412803ad171822c04df9853",
       "tree": "2033e17e0abe3f04cad2f8060531b4d415894e7e"
