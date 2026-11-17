@@ -110,10 +110,17 @@ class VerifyCasesSmokeTest(unittest.TestCase):
 
     def test_reference_selection_is_recorded_for_every_case(self) -> None:
         case_dirs = sorted((verify_cases.ROOT / "cases").iterdir())
-        self.assertEqual(len(case_dirs), 10)
+        cases = {d: json.loads((d / "case.yaml").read_text(encoding="utf-8")) for d in case_dirs}
+        # the first ten cases have no verifier_revision; mined cases (BENCH-20) record their own selection text
+        first_ten = [d for d, case in cases.items() if "verifier_revision" not in case]
+        self.assertEqual(len(first_ten), 10)
         for case_dir in case_dirs:
             with self.subTest(case=case_dir.name):
-                case = json.loads((case_dir / "case.yaml").read_text(encoding="utf-8"))
+                case = cases[case_dir]
+                if case_dir not in first_ten:
+                    self.assertTrue(case["reference_selection"])
+                    self.assertTrue(case["bug_test"])
+                    continue
                 self.assertEqual(
                     case["reference_selection"],
                     "first upstream diff test with a 3/3 base failure",
