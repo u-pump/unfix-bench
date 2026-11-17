@@ -26,5 +26,7 @@
     "verdict": "REPRODUCED",
     "runs": "3/3",
     "elapsed_s": 11.6
-  }
+  },
+  "agent_input_repo": "https://github.com/u-pump/bench-in-coremqtt-331",
+  "input_sha256": "37b0c2464e31d7e96f8dbc4584e08f63e487f803a01074d4e0a6767428b2e364"
 }
