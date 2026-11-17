@@ -1,0 +1,274 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 U-Pump
+name: Run Codex CLI attempt
+
+# Owner-triggered. Runs Codex CLI once per open case inside the same Docker sandbox as Claude Code
+# (same image, same flags) whose only reachable host is api.openai.com, then verifies the patch with
+# the same verifier as every other agent and opens a pull request with the results.
+# See docs/run-codex.md. Cases 1-10 were run with Codex CLI on a local machine and are not run again.
+on:
+  workflow_dispatch:
+    inputs:
+      case_id:
+        description: 'Case ID (blank means every case without a recorded first attempt)'
+        required: false
+        type: string
+      probe_only:
+        description: 'Only build the sandbox and prove the network isolation; no API call, no attempt'
+        required: false
+        type: boolean
+        default: false
+  # A change to the sandbox re-runs the isolation proof (no secrets, no attempt).
+  pull_request:
+    paths:
+      - 'docker/**'
+      - 'scripts/agent_sandbox.sh'
+      - 'scripts/probe_inputs.sh'
+      - 'scripts/check_input.py'
+      - 'scripts/run_codex_case.sh'
+      - 'scripts/collect_codex_run.py'
+      - 'scripts/plan_cases.py'
+      - '.github/workflows/run-codex.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codex-run
+  cancel-in-progress: false
+
+env:
+  # Fixed, as the Codex CLI version is (docker/claude-agent/Dockerfile, CODEX_CLI_VERSION); the reasoning effort
+  # "medium" is fixed in scripts/agent_sandbox.sh. These are the values the first ten cases were run with.
+  AGENT_MODEL: gpt-6-sol
+  SANDBOX_AGENT: codex
+
+jobs:
+  plan:
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.probe_only && github.actor == 'u-pump' }}
+    runs-on: ubuntu-latest
+    outputs:
+      cases: ${{ steps.plan.outputs.cases }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Choose cases
+        id: plan
+        env:
+          INPUT_CASE: ${{ inputs.case_id }}
+        run: |
+          cases=$(python scripts/plan_cases.py --agent codex-cli "$INPUT_CASE")
+          echo "cases=$cases" >> "$GITHUB_OUTPUT"
+
+  probe:
+    if: ${{ (github.event_name != 'workflow_dispatch' || inputs.probe_only) && github.actor == 'u-pump' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Build the sandbox
+        run: |
+          mkdir -p "$RUNNER_TEMP/probe"
+          bash scripts/agent_sandbox.sh build | tee "$RUNNER_TEMP/probe/build.log"
+      - name: Start the isolated network and egress proxy
+        run: bash scripts/agent_sandbox.sh up
+      - name: Prove what the container can and cannot reach
+        run: bash scripts/agent_sandbox.sh proof "$RUNNER_TEMP/probe/network-proof.log"
+      - name: Collect the proxy log
+        if: always()
+        run: bash scripts/agent_sandbox.sh proxy-log "$RUNNER_TEMP/probe/proxy.log"
+      - name: Check every frozen input
+        env:
+          BENCH_INPUT_TOKEN: ${{ secrets.BENCH_INPUT_TOKEN }}
+        run: bash scripts/probe_inputs.sh "$RUNNER_TEMP/probe/input-check.log"
+      - name: Remove the sandbox
+        if: always()
+        run: bash scripts/agent_sandbox.sh down
+      - name: Dry run of the attempt script (input, sandbox, proof; no agent, no API call)
+        env:
+          BENCH_INPUT_TOKEN: ${{ secrets.BENCH_INPUT_TOKEN }}
+          DRY_RUN: '1'
+        run: |
+          if [ -z "$BENCH_INPUT_TOKEN" ]; then echo "SKIPPED: BENCH_INPUT_TOKEN is not configured"; exit 0; fi
+          bash scripts/run_codex_case.sh fmt-4800 "$RUNNER_TEMP/probe/dry-run"
+      - name: Scan before upload
+        if: always()
+        run: find "$RUNNER_TEMP/probe" -type f -print0 | xargs -0 python scripts/collect_codex_run.py scan
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: probe
+          path: ${{ runner.temp }}/probe/
+          retention-days: 7
+
+  agent:
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.probe_only && github.actor == 'u-pump' }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        case: ${{ fromJSON(needs.plan.outputs.cases) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Run one attempt
+        env:
+          BENCH_INPUT_TOKEN: ${{ secrets.BENCH_INPUT_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CASE_ID: ${{ matrix.case }}
+        run: bash scripts/run_codex_case.sh "$CASE_ID" "$RUNNER_TEMP/out"
+      - name: Scan everything before upload
+        id: scan
+        if: always()
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          find "$RUNNER_TEMP/out" -type f -print0 | xargs -0 python scripts/collect_codex_run.py scan
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ always() && steps.scan.outcome == 'success' }}
+        with:
+          name: run-${{ matrix.case }}
+          path: ${{ runner.temp }}/out/
+          retention-days: 7
+
+  verify:
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && !inputs.probe_only && needs.plan.result == 'success' && github.actor == 'u-pump' }}
+    needs: [plan, agent]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        case: ${{ fromJSON(needs.plan.outputs.cases) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        continue-on-error: true
+        with:
+          name: run-${{ matrix.case }}
+          path: ${{ runner.temp }}/run
+      - name: Place the recorded attempt
+        id: place
+        env:
+          CASE_ID: ${{ matrix.case }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/final/results/$CASE_ID"
+          run="$RUNNER_TEMP/run/result"
+          if [ -f "$run/agent.yaml" ] && [ -f "$run/agent-fix.patch" ]; then
+            dest="cases/$CASE_ID/agents/codex-cli"
+            cp "$run/agent.yaml" "$run/agent-fix.patch" "$dest/"
+            mkdir -p "$RUNNER_TEMP/final/$dest"
+            echo "recorded=true" >> "$GITHUB_OUTPUT"
+            if [ -s "$run/agent-fix.patch" ]; then echo "has_patch=true" >> "$GITHUB_OUTPUT"; fi
+          elif [ -f "$run/results/$CASE_ID/codex-cli.md" ]; then
+            cp "$run/results/$CASE_ID/codex-cli.md" "$RUNNER_TEMP/final/results/$CASE_ID/"
+          else
+            python scripts/collect_codex_run.py error --case "$CASE_ID" \
+              --reason "agent: no result was produced; see the run log" \
+              --results-dir "$RUNNER_TEMP/final/results"
+          fi
+      - name: Make ThreadSanitizer usable on the runner
+        # The runner kernel randomises memory mappings over a wider range than ThreadSanitizer
+        # supports ("FATAL: ThreadSanitizer: unexpected memory mapping"); cases built with TSan
+        # then fail before running any test. The local machine does not have this limit.
+        run: |
+          sudo sysctl vm.mmap_rnd_bits
+          sudo sysctl -w vm.mmap_rnd_bits=28
+          sudo sysctl vm.mmap_rnd_bits
+      - name: Install private verifier
+        if: steps.place.outputs.has_patch == 'true'
+        env:
+          CPLUS_READ_TOKEN: ${{ secrets.CPLUS_READ_TOKEN }}
+          SELECT_CASE: ${{ matrix.case }}
+          SELECT_AGENT: codex-cli
+        run: |
+          read -r -a revisions <<< "$(python scripts/verify_cases.py --revisions)"
+          bash scripts/install_private.sh "${revisions[@]}"
+      - name: Verify with the same verifier as every other agent
+        if: steps.place.outputs.recorded == 'true'
+        env:
+          CPLUS_DATA_DIR: ${{ runner.temp }}/cplus-data
+          RESULTS_DIR: ${{ runner.temp }}/final/results
+          SELECT_CASE: ${{ matrix.case }}
+          SELECT_AGENT: codex-cli
+        run: |
+          mkdir -p ../.tmp
+          python scripts/verify_cases.py || true
+          test -f "$RESULTS_DIR/$SELECT_CASE/codex-cli.md"
+      - name: Keep the recorded files with the result
+        if: steps.place.outputs.recorded == 'true'
+        env:
+          CASE_ID: ${{ matrix.case }}
+        run: |
+          dest="cases/$CASE_ID/agents/codex-cli"
+          cp "$dest/agent.yaml" "$dest/agent-fix.patch" "$RUNNER_TEMP/final/$dest/"
+      - name: Scan before upload
+        run: find "$RUNNER_TEMP/final" -type f -print0 | xargs -0 python scripts/collect_codex_run.py scan
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: final-${{ matrix.case }}
+          path: ${{ runner.temp }}/final/
+          retention-days: 7
+
+  record:
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && !inputs.probe_only && needs.verify.result != 'skipped' && github.actor == 'u-pump' }}
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: final-*
+          path: ${{ runner.temp }}/final
+          merge-multiple: true
+      - name: Update the tree and README from the results
+        run: |
+          cp -R "$RUNNER_TEMP/final/." .
+          python scripts/render_readme.py
+          python scripts/render_readme.py --check
+      - name: Open a pull request for the owner to review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          branch="codex-run-${GITHUB_RUN_ID}"
+          git add -A cases results README.md
+          if git diff --cached --quiet; then echo "Nothing to record"; exit 0; fi
+          git -c user.name='unfix-bench-bot' -c user.email='unfix-bench-bot@users.noreply.github.com' \
+            commit -qm "Record Codex CLI attempt(s) from run ${GITHUB_RUN_ID}"
+          git push -q origin "HEAD:refs/heads/${branch}"
+          {
+            echo "Results of the [Codex CLI run](${RUN_URL}). A case with a recorded attempt has its network isolation proof in the run artifacts. A case that shows ERROR did not complete an attempt: no patch is recorded and the case stays open."
+            echo
+            echo "Review the patches, metadata and verdicts before merging. Nothing is published until this pull request is merged."
+          } > "$RUNNER_TEMP/body.md"
+          gh pr create --base main --head "$branch" --title "Codex CLI attempts (run ${GITHUB_RUN_ID})" --body-file "$RUNNER_TEMP/body.md"

@@ -2,21 +2,43 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 U-Pump
 #
-# Docker sandbox for the Claude Code benchmark attempt.
+# Docker sandbox for the benchmark attempts of Claude Code and Codex CLI.
+#
+# SANDBOX_AGENT=claude (default) or codex selects the agent and the one API host the proxy
+# lets through (api.anthropic.com or api.openai.com); everything else is identical.
 #
 #   build                      build the agent and proxy images
 #   up                         create the internal network and start the egress proxy
 #   proof <log-file>           prove what the agent container can and cannot do
 #   agent <work> <task> <transcript> <stderr> <model>
-#                              run Claude Code once in the sandbox
+#                              run the agent once in the sandbox
 #   patch <work> <out-dir>     save the agent's changes as a patch (no network)
 #   proxy-log <file>           copy the proxy log
 #   down                       remove containers and networks
 #
 # The agent container sits on an --internal Docker network, so it has no route to
 # anything. The only other container on that network is a proxy that forwards CONNECT
-# requests to api.anthropic.com:443 and refuses every other host and port.
+# requests to the agent's API host on port 443 and refuses every other host and port.
 set -u
+
+SANDBOX_AGENT="${SANDBOX_AGENT:-claude}"
+case "$SANDBOX_AGENT" in
+    claude) API_HOST="api.anthropic.com"; OTHER_API_HOST="api.openai.com"; ALLOW_LIST="allow.list" ;;
+    codex) API_HOST="api.openai.com"; OTHER_API_HOST="api.anthropic.com"; ALLOW_LIST="allow-openai.list" ;;
+    *) echo "SANDBOX_AGENT must be claude or codex" >&2; exit 2 ;;
+esac
+# The Codex CLI invocation. The container is the sandbox (read-only root, no capabilities, internal network),
+# so Codex's own sandbox is bypassed; --strict-config makes an unknown option an error at the proof, not a
+# silent no-op in the attempt. No web search, apps, browser, plugins, hooks, sub-agents or AGENTS.md;
+# no user config, no persisted session.
+codex_args=(
+    codex exec --json --ephemeral --skip-git-repo-check --ignore-user-config --ignore-rules --strict-config
+    --dangerously-bypass-approvals-and-sandbox
+    -c 'model_reasoning_effort="medium"'
+    -c 'web_search="disabled"' -c project_doc_max_bytes=0
+    --disable apps --disable browser_use --disable computer_use --disable plugins --disable hooks
+    --disable multi_agent --disable image_generation
+)
 
 RUN_ID="${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}-$$"
 AGENT_IMAGE="bench-agent:${RUN_ID}"
@@ -69,14 +91,19 @@ cmd_build() {
     save_state
     echo "agent image id: $(docker image inspect --format '{{.Id}}' "$AGENT_IMAGE")"
     echo "claude version: $(docker run --rm --user "$(id -u):$(id -g)" "$AGENT_IMAGE" claude --version)"
+    # codex prints a harmless warning on stderr when its home does not exist; the version is the last line.
+    echo "codex version: $(docker run --rm --user "$(id -u):$(id -g)" "$AGENT_IMAGE" codex --version 2>/dev/null | tail -n 1)"
 }
 
 cmd_up() {
     load_state
     docker network create --internal "$INTERNAL_NET" >/dev/null || return 1
     docker network create "$EGRESS_NET" >/dev/null || return 1
+    # The allow list of the selected agent replaces the one baked into the image (api.anthropic.com).
     docker run -d --name "$PROXY_NAME" --network "$EGRESS_NET" --cap-drop ALL \
-        --security-opt no-new-privileges --read-only --tmpfs /tmp:rw "$PROXY_IMAGE" >/dev/null || return 1
+        --security-opt no-new-privileges --read-only --tmpfs /tmp:rw \
+        -v "$ROOT/docker/egress-proxy/${ALLOW_LIST}:/etc/tinyproxy/allow.list:ro" \
+        "$PROXY_IMAGE" >/dev/null || return 1
     docker network connect --alias "$PROXY_NAME" "$INTERNAL_NET" "$PROXY_NAME" || return 1
     for _ in $(seq 1 30); do
         if docker run --rm --network "$INTERNAL_NET" "$AGENT_IMAGE" \
@@ -115,11 +142,11 @@ cmd_proof() {
     work=$(mktemp -d)
     {
         echo "== Network and sandbox proof, $(date -u +%Y-%m-%dT%H:%M:%SZ) =="
-        echo "Agent container: internal network, no default route; egress only via ${PROXY_NAME} (api.anthropic.com:443)."
+        echo "Agent container: internal network, no default route; egress only via ${PROXY_NAME} (${API_HOST}:443)."
         expect "direct github.com (no proxy) is unreachable" fail \
             curl --noproxy '*' -sS -m 10 -o /dev/null https://github.com
-        expect "direct api.anthropic.com (no proxy) is unreachable" fail \
-            curl --noproxy '*' -sS -m 10 -o /dev/null https://api.anthropic.com
+        expect "direct ${API_HOST} (no proxy) is unreachable" fail \
+            curl --noproxy '*' -sS -m 10 -o /dev/null https://${API_HOST}
         expect "direct IP 1.1.1.1 is unreachable" fail \
             curl --noproxy '*' -sS -m 5 -o /dev/null http://1.1.1.1
         expect "DNS for github.com does not resolve" fail getent hosts github.com
@@ -127,10 +154,10 @@ cmd_proof() {
             curl -sS -m 15 -o /dev/null https://github.com
         expect "example.com through the proxy is refused" fail \
             curl -sS -m 15 -o /dev/null https://example.com
-        expect "api.anthropic.com on port 8443 is refused" fail \
-            curl -sS -m 15 -o /dev/null https://api.anthropic.com:8443
-        expect "api.anthropic.com:443 is reachable through the proxy" pass \
-            curl -sS -m 30 -o /dev/null https://api.anthropic.com/
+        expect "${API_HOST} on port 8443 is refused" fail \
+            curl -sS -m 15 -o /dev/null https://${API_HOST}:8443
+        expect "${API_HOST}:443 is reachable through the proxy" pass \
+            curl -sS -m 30 -o /dev/null https://${API_HOST}/
         expect "root filesystem is read-only" fail touch /etc/bench-write-test
         expect "container is not root" pass sh -c 'test "$(id -u)" != 0'
         expect "no Linux capabilities" pass sh -c 'grep -q "^CapEff:.0000000000000000$" /proc/self/status'
@@ -140,6 +167,22 @@ cmd_proof() {
             *wrote-work*) printf 'OK    %-58s\n' "the work directory is writable" ;;
             *) printf 'FAIL  %-58s %s\n' "the work directory is writable" "${out:0:200}"; PROOF_FAILED=1 ;;
         esac
+        if [ "$SANDBOX_AGENT" = codex ]; then
+            expect "${OTHER_API_HOST} through the proxy is refused" fail \
+                curl -sS -m 15 -o /dev/null https://${OTHER_API_HOST}/
+            # Start Codex CLI with a deliberately fake key and the exact invocation flags. It must get as
+            # far as starting a turn (--strict-config rejects an unknown option before that) and then be
+            # refused by the API through the proxy; the proxy log shows every host it tried to reach.
+            # The attempt itself is cut off after 60 seconds because Codex retries a refused key for a while.
+            out=$(printf 'hello' | in_agent_net -i -e CODEX_API_KEY=probe-not-a-real-key-0000000000 \
+                -e CODEX_HOME=/home/agent/.codex "$AGENT_IMAGE" \
+                sh -c 'mkdir -p "$CODEX_HOME" && exec "$@"' sh timeout 60 "${codex_args[@]}" -m probe-model - 2>&1)
+            printf '      codex printed: %s\n' "$(printf '%s' "${out:0:400}" | tr '\n' ' ')"
+            case "$out" in
+                *'"type":"turn.started"'*) printf 'OK    %-58s\n' "Codex CLI starts a turn with the invocation flags (fake key: API refusal expected)" ;;
+                *) printf 'FAIL  %-58s\n' "Codex CLI starts a turn with the invocation flags"; PROOF_FAILED=1 ;;
+            esac
+        else
         # Start Claude Code with a deliberately fake token. It must get as far as asking the
         # API (through the proxy) and be refused there; the proxy log then shows every host it
         # tried to reach. A start-up failure of any other kind fails the proof.
@@ -155,6 +198,7 @@ cmd_proof() {
                 printf 'FAIL  %-58s\n' "Claude Code starts with the invocation flags"; PROOF_FAILED=1 ;;
             *) printf 'OK    %-58s\n' "Claude Code starts with the invocation flags (fake key: API refusal expected)" ;;
         esac
+        fi
         if [ "$PROOF_FAILED" -eq 0 ]; then echo "RESULT: all proofs passed"; else echo "RESULT: PROOF FAILED"; fi
     } 2>&1 | tee "$log"
     rm -rf "$work"
@@ -165,6 +209,14 @@ cmd_proof() {
 cmd_agent() {
     load_state
     local work=$1 task=$2 transcript=$3 stderr_log=$4 model=$5
+    if [ "$SANDBOX_AGENT" = codex ]; then
+        # The key is read from CODEX_API_KEY (what `codex exec` uses); the CODEX_HOME directory must exist.
+        docker run --rm -i --name "bench-agent-${RUN_ID}" "${hardening[@]}" --network "$INTERNAL_NET" \
+            "${proxy_env[@]}" -e CODEX_API_KEY -e CODEX_HOME=/home/agent/.codex -v "$work":/work:rw -w /work \
+            "$AGENT_IMAGE" sh -c 'mkdir -p "$CODEX_HOME" && exec "$@"' sh \
+            timeout -k 30 3600 "${codex_args[@]}" -m "$model" - < "$task" > "$transcript" 2> "$stderr_log"
+        return
+    fi
     docker run --rm -i --name "bench-agent-${RUN_ID}" "${hardening[@]}" --network "$INTERNAL_NET" \
         "${proxy_env[@]}" -e ANTHROPIC_API_KEY -v "$work":/work:rw -w /work "$AGENT_IMAGE" \
         timeout -k 30 3600 claude -p --output-format stream-json --verbose --no-session-persistence \
