@@ -67,6 +67,10 @@ Pilot 1 (run 43768563003) went through the whole chain and accepted 0 of 10: eve
 
 New cases and miner drafts are verified with cplus `6967f904db2659e61142591664c0508e81e262c6` instead of `77c7df19b63efbf7f96a8c0d9451698ba9c14e15`. Reason: `77c7df1` does not contain the fixes to the image, to submodules and to the ctest output, so Unity cases do not pass on it. `6967f90` was checked on a live run in c-plus (PRs #94 and #96): the upstream fix of coremqtt-331 is VERIFIED with all 8 gates PASS, forged fixes are REJECTED. The 20 published results stay on `81c0fda242fef1daf55d3164e06127d372c81caa` and are not verified again. The existing draft `candidates/coremqtt-331` now carries `verifier_revision` too (a case without the field would be verified with the legacy revision).
 
+## BENCH-20: ruby and unifdef in the agent image; submodule pins checked in the input check
+
+(1) **Agent image.** `docker/claude-agent` gets `ruby` (3.2.3) and `unifdef` (2.12-1), the versions of `docker/miner-build`, with the same build-time check that fails the build when a version drifts. Reason: CMock generates its mocks with ruby and FreeRTOS-Plus-TCP's unit-test CMake runs `unifdefall`; without them the agent could not do what `TASK.md` says ("Run the existing tests") on a Unity case while the verifier can, which makes the conditions unequal. This changes the agent image, so the note is in `docs/protocol.md` (agent conditions): cases 11 and later have ruby and unifdef in the image; for the first ten it made no difference (none uses CMock). (2) **`check_input.py`.** For a case with `submodules`, the pins in `case.yaml` must equal the gitlinks of the upstream tree at `base` (both directions: a missing or an extra pin fails); this is blocking when the upstream clone is available. `git archive` leaves submodule files out, so `input_sha256` (archive + `ISSUE.md` + `TASK.md`) cannot cover them: for such cases it stays reference only and the check says so. The main protection of the input is the commit and tree pinned in `inputs/bench-in-heads.json`.
+
 ## Known issues and backlog
 
 Small open items that are not part of a numbered task. Fix each in its own PR.

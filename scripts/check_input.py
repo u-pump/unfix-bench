@@ -85,10 +85,42 @@ def blocking_problems(input_dir: Path, pinned_commit: str) -> list[str]:
     return problems
 
 
+def submodule_problems(case: dict[str, object], upstream_dir: Path | None) -> list[str]:
+    """Blocking for a case with ``submodules``: the pins in case.yaml equal the gitlinks of the upstream base.
+
+    ``git archive`` leaves submodule files out, so the input of such a case holds them as plain files and
+    ``input_sha256`` cannot cover them (reference only); this pin comparison and the commit/tree in
+    ``bench-in-heads.json`` are what protect it. Without an upstream clone the comparison is skipped here
+    (``notes`` says so), as the other upstream comparisons are.
+    """
+    pins = case.get("submodules")
+    if not pins or upstream_dir is None:
+        return []
+    try:
+        tree = git(upstream_dir, "ls-tree", "-r", "-z", str(case["base"])).decode("utf-8").split(chr(0))
+    except RuntimeError:
+        return []
+    links = {}
+    for row in filter(None, tree):
+        meta, name = row.split(chr(9), 1)
+        mode, _kind, blob = meta.split()
+        if mode == "160000":
+            links[name] = blob
+    wanted = {str(item["path"]): str(item["commit"]) for item in pins}  # type: ignore[index, union-attr]
+    problems = []
+    for path in sorted(wanted.keys() | links.keys()):
+        if wanted.get(path) != links.get(path):
+            problems.append(
+                f"submodule {path}: case.yaml pins {wanted.get(path, 'nothing')}, "
+                f"upstream base has {links.get(path, 'no gitlink')}"
+            )
+    return problems
+
+
 def notes(case: dict[str, object], input_dir: Path, upstream_dir: Path | None) -> list[str]:
     """Information lines about the frozen hash and the difference from upstream."""
     if upstream_dir is None:
-        return ["input_sha256 and upstream comparison not checked: upstream clone unavailable"]
+        return ["input_sha256, submodule pins and upstream comparison not checked: upstream clone unavailable"]
     try:
         archive = git(upstream_dir, "archive", "--format=tar", str(case["base"]))
         issue = git(input_dir, "cat-file", "blob", "HEAD:ISSUE.md")
@@ -96,8 +128,11 @@ def notes(case: dict[str, object], input_dir: Path, upstream_dir: Path | None) -
     except RuntimeError:
         return ["input_sha256 and upstream comparison not checked: upstream base unavailable"]
     digest = hashlib.sha256(archive + issue + task).hexdigest()
-    verdict = "matches case.yaml" if digest == case["input_sha256"] else "does NOT match case.yaml"
+    verdict = "matches case.yaml" if digest == case.get("input_sha256") else "does NOT match case.yaml"
     lines = [f"input_sha256 recomputed: {verdict} (information only)"]
+    if case.get("submodules"):
+        lines.append("input_sha256 is reference only for a case with submodules: the archive leaves their files out; "
+                     "the pinned commit/tree protect the input")
     expected = archive_entries(archive)
     actual = {k: v for k, v in input_entries(input_dir).items() if k not in EXTRA_FILES}
     missing = sorted(expected.keys() - actual.keys())
@@ -115,7 +150,7 @@ def check(
     case: dict[str, object], input_dir: Path, upstream_dir: Path | None, pinned_commit: str
 ) -> tuple[list[str], list[str]]:
     """Return (blocking problems, information lines)."""
-    problems = blocking_problems(input_dir, pinned_commit)
+    problems = blocking_problems(input_dir, pinned_commit) + submodule_problems(case, upstream_dir)
     return problems, ([] if problems else notes(case, input_dir, upstream_dir))
 
 
