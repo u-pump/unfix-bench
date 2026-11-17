@@ -1,0 +1,66 @@
+diff --git a/source/core_mqtt_serializer.c b/source/core_mqtt_serializer.c
+index 7298176..062100a 100644
+--- a/source/core_mqtt_serializer.c
++++ b/source/core_mqtt_serializer.c
+@@ -1706,9 +1706,20 @@ MQTTStatus_t MQTT_GetConnectPacketSize( const MQTTConnectInfo_t * pConnectInfo,
+                     ( void * ) pPacketSize ) );
+         status = MQTTBadParameter;
+     }
+-    else if( ( pConnectInfo->clientIdentifierLength == 0U ) || ( pConnectInfo->pClientIdentifier == NULL ) )
++    else if( ( pConnectInfo->clientIdentifierLength == 0U ) && ( pConnectInfo->cleanSession == false ) )
+     {
+-        LogError( ( "Mqtt_GetConnectPacketSize() client identifier must be set." ) );
++        /* MQTT 3.1.1 section 3.1.3.1: a zero-length client identifier
++         * requires CleanSession to be set to 1. */
++        LogError( ( "Mqtt_GetConnectPacketSize() a zero-length client identifier "
++                    "requires cleanSession to be true." ) );
++        status = MQTTBadParameter;
++    }
++    else if( ( pConnectInfo->clientIdentifierLength != 0U ) &&
++             ( ( pConnectInfo->pClientIdentifier == NULL ) ||
++               ( pConnectInfo->pClientIdentifier[ 0 ] == '\0' ) ) )
++    {
++        LogError( ( "Mqtt_GetConnectPacketSize() client identifier length is "
++                    "non-zero but the client identifier is NULL or empty." ) );
+         status = MQTTBadParameter;
+     }
+     else if( ( pWillInfo != NULL ) && ( pWillInfo->payloadLength > ( size_t ) UINT16_MAX ) )
+diff --git a/test/unit-test/core_mqtt_serializer_utest.c b/test/unit-test/core_mqtt_serializer_utest.c
+index c359e29..e65a063 100644
+--- a/test/unit-test/core_mqtt_serializer_utest.c
++++ b/test/unit-test/core_mqtt_serializer_utest.c
+@@ -468,6 +468,34 @@ void test_MQTT_GetConnectPacketSize( void )
+     status = MQTT_GetConnectPacketSize( &connectInfo, NULL, &remainingLength, &packetSize );
+     TEST_ASSERT_EQUAL_INT( MQTTBadParameter, status );
+ 
++    /* Verify an empty string with a non-zero length fails. */
++    connectInfo.pClientIdentifier = "";
++    connectInfo.clientIdentifierLength = CLIENT_IDENTIFIER_LENGTH;
++    status = MQTT_GetConnectPacketSize( &connectInfo, NULL, &remainingLength, &packetSize );
++    TEST_ASSERT_EQUAL_INT( MQTTBadParameter, status );
++
++    /* Verify a zero-length client identifier is accepted with a clean session
++     * (MQTT 3.1.1 section 3.1.3.1). */
++    memset( &connectInfo, 0x0, sizeof( connectInfo ) );
++    connectInfo.cleanSession = true;
++    connectInfo.pClientIdentifier = NULL;
++    connectInfo.clientIdentifierLength = 0;
++    status = MQTT_GetConnectPacketSize( &connectInfo, NULL, &remainingLength, &packetSize );
++    TEST_ASSERT_EQUAL_INT( MQTTSuccess, status );
++    TEST_ASSERT_EQUAL_INT( 12, remainingLength );
++    TEST_ASSERT_EQUAL_INT( 14, packetSize );
++
++    connectInfo.pClientIdentifier = "";
++    status = MQTT_GetConnectPacketSize( &connectInfo, NULL, &remainingLength, &packetSize );
++    TEST_ASSERT_EQUAL_INT( MQTTSuccess, status );
++    TEST_ASSERT_EQUAL_INT( 12, remainingLength );
++    TEST_ASSERT_EQUAL_INT( 14, packetSize );
++
++    /* A zero-length client identifier without a clean session fails. */
++    connectInfo.cleanSession = false;
++    status = MQTT_GetConnectPacketSize( &connectInfo, NULL, &remainingLength, &packetSize );
++    TEST_ASSERT_EQUAL_INT( MQTTBadParameter, status );
++
+     /* Test a will message payload length that is too large. */
+     memset( &connectInfo, 0x0, sizeof( connectInfo ) );
+     connectInfo.pClientIdentifier = CLIENT_IDENTIFIER;

@@ -1,10 +1,37 @@
 {
   "name": "Claude Code",
-  "version": null,
-  "model": null,
-  "invocation": null,
-  "date_utc": null,
-  "environment": null,
-  "patch_sha256": null,
-  "attempt_note": null
+  "version": "2.1.323 (Claude Code)",
+  "model": "claude-opus-5-5",
+  "requested_model": "claude-opus-5-5",
+  "effort": "default (not set)",
+  "date_utc": "2026-11-17T23:25:53Z",
+  "environment": "GitHub Actions ubuntu-latest; agent in a Docker container (read-only root, non-root uid, writable only /work and a tmpfs home, all capabilities dropped); container network is internal and egress goes through a proxy that allows only api.anthropic.com:443; --safe-mode, no web tools, no MCP, no memory or CLAUDE.md",
+  "invocation": "claude -p --output-format stream-json --verbose --no-session-persistence --safe-mode --strict-mcp-config --disable-slash-commands --permission-mode acceptEdits --permission-prompts none --tools Bash,Read,Edit,Write,Glob,Grep --allowedTools Bash,Read,Edit,Write,Glob,Grep --disallowedTools WebSearch,WebFetch --model claude-opus-5-5 (task text on stdin)",
+  "session_id": "e6e91e7e-3496-44be-ba7f-a37d4d6de8fd",
+  "patch_sha256": "669b364daae0e3525c93012d298824461a10a188381a3728c7148e1f6e57949a",
+  "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "metrics": {
+    "bash_commands": 10,
+    "tool_calls": 12,
+    "turns": 13,
+    "duration_seconds": 43,
+    "tokens": {
+      "input": 22,
+      "output": 3905,
+      "cache_creation_input": 14705,
+      "cache_read_input": 135901
+    }
+  },
+  "network_commands_seen_in_transcript": [],
+  "proxy": {
+    "refused_requests": 0,
+    "refused": {},
+    "allowed_connections": {
+      "api.anthropic.com": 3
+    },
+    "scope": "agent run only, counted from the proxy log; the isolation proof's requests are excluded"
+  },
+  "run_url": "https://github.com/u-pump/unfix-bench/actions/runs/44198931220",
+  "image": "sha256:b2283ce5814d2139d1890275818c4a39f369d14cf56ba405e8928839fed5503e",
+  "network_proof": "all isolation proofs passed before the run; log in the run artifact"
 }
