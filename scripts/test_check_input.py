@@ -107,6 +107,61 @@ class CheckInputTest(unittest.TestCase):
         self.assertIn("not checked", info[0])
 
 
+class SubmodulePinsTest(unittest.TestCase):
+    """A case with `submodules`: the pins in case.yaml must equal the gitlinks of the upstream base."""
+
+    PIN = "a" * 40
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.upstream = Path(self.tmp.name)
+        git(self.upstream, "init", "-q")
+        (self.upstream / "a.c").write_text("int main(void){return 0;}\n", encoding="utf-8")
+        git(self.upstream, "add", "-A")
+        git(self.upstream, "update-index", "--add", "--cacheinfo", f"160000,{self.PIN},test/unit-test/CMock")
+        git(self.upstream, "commit", "-q", "-m", "base")
+        self.base = git(self.upstream, "rev-parse", "HEAD")
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def case(self, *pins: tuple[str, str]) -> dict[str, object]:
+        return {"id": "demo", "base": self.base, "submodules": [{"path": p, "commit": c} for p, c in pins]}
+
+    def test_equal_pins_pass(self) -> None:
+        case = self.case(("test/unit-test/CMock", self.PIN))
+        self.assertEqual(check_input.submodule_problems(case, self.upstream), [])
+
+    def test_a_different_commit_is_blocking(self) -> None:
+        problems = check_input.submodule_problems(self.case(("test/unit-test/CMock", "b" * 40)), self.upstream)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("test/unit-test/CMock", problems[0])
+
+    def test_a_missing_or_extra_pin_is_blocking(self) -> None:
+        missing = check_input.submodule_problems(self.case(("x/y", self.PIN)), self.upstream)
+        self.assertEqual(len(missing), 2)  # x/y has no gitlink, CMock is not pinned
+        self.assertTrue(any("no gitlink" in p for p in missing))
+        self.assertTrue(any("pins nothing" in p for p in missing))
+
+    def test_a_case_without_submodules_or_without_upstream_is_not_checked(self) -> None:
+        self.assertEqual(check_input.submodule_problems({"id": "demo", "base": self.base}, self.upstream), [])
+        self.assertEqual(check_input.submodule_problems(self.case(("x", "b" * 40)), None), [])
+
+    def test_the_reference_hash_is_labelled_for_such_a_case(self) -> None:
+        inp = Path(self.tmp.name) / "input"
+        inp.mkdir()
+        git(inp, "init", "-q")
+        (inp / "ISSUE.md").write_text(ISSUE, encoding="utf-8")
+        (inp / "TASK.md").write_text(check_input.TASK_TEXT, encoding="utf-8")
+        git(inp, "add", "-A")
+        git(inp, "commit", "-q", "-m", "input")
+        head = git(inp, "rev-parse", "HEAD")
+        case = self.case(("test/unit-test/CMock", self.PIN))
+        problems, info = check_input.check(case, inp, self.upstream, head)
+        self.assertEqual(problems, [])
+        self.assertTrue(any("reference only" in line for line in info))
+
+
 class PinsTest(unittest.TestCase):
     def test_every_case_has_a_pinned_commit_and_tree(self) -> None:
         pins = json.loads((ROOT / "inputs" / "bench-in-heads.json").read_text(encoding="utf-8"))["inputs"]

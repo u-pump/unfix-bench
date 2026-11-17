@@ -125,6 +125,15 @@ class DockerfileTest(unittest.TestCase):
         self.assertIn("exit 1", self.TEXT)  # the build fails when a version drifts
         self.assertNotIn("@CMAKE@", self.TEXT)
 
+    def test_the_agent_image_has_the_same_pinned_ruby_and_unifdef(self) -> None:
+        agent = (ROOT / "docker" / "claude-agent" / "Dockerfile").read_text(encoding="utf-8")
+        for name in ("RUBY", "UNIFDEF"):
+            self.assertEqual(re.search(rf"(?m)^ARG {name}_VERSION=(\S+)$", agent).group(1),  # type: ignore[union-attr]
+                             re.search(rf"(?m)^ARG {name}_VERSION=(\S+)$", self.TEXT).group(1))  # type: ignore[union-attr]
+        self.assertRegex(agent, r"python3 ruby unifdef valgrind")
+        self.assertIn('check ruby "$(ruby -e', agent)
+        self.assertIn('check unifdef "$(dpkg-query', agent)
+
     def test_same_base_digest_as_the_agent_image(self) -> None:
         agent = (ROOT / "docker" / "claude-agent" / "Dockerfile").read_text(encoding="utf-8")
         digest = re.search(r"sha256:[0-9a-f]{64}", self.TEXT).group(0)  # type: ignore[union-attr]
