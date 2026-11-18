@@ -99,7 +99,7 @@ class CaseRulesTest(Fixture):
         return self.problems()
 
     def test_verifier_revision_is_optional_but_must_be_a_full_commit(self) -> None:
-        self.assertEqual(self.broken(verifier_revision="6967f904db2659e61142591664c0508e81e262c6"), [])
+        self.assertEqual(self.broken(verifier_revision="dadf0588efee26730378c298fdddd212437aed86"), [])
         self.assertTrue(any("verifier_revision" in p for p in self.broken(verifier_revision="6967f90")))
 
     def test_owner_only_fields_are_refused(self) -> None:
