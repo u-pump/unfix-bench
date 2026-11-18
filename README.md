@@ -11,7 +11,7 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 <!-- results:start -->
 | Case | Project | Bug | Codex CLI | Claude Code |
 | --- | --- | --- | --- | --- |
-| coremqtt-331 | [coreMQTT](https://github.com/FreeRTOS/coreMQTT) | [#331: zero-length client identifier](https://github.com/FreeRTOS/coreMQTT/pull/331) | [PENDING](results/coremqtt-331/codex-cli.md) | [PENDING](results/coremqtt-331/claude-code.md) |
+| coremqtt-331 | [coreMQTT](https://github.com/FreeRTOS/coreMQTT) | [#331: zero-length client identifier](https://github.com/FreeRTOS/coreMQTT/pull/331) | [PENDING](results/coremqtt-331/codex-cli.md) | [NOT_VERIFIABLE](results/coremqtt-331/claude-code.md) |
 | cpp-peglib-121 | [cpp-peglib](https://github.com/yhirose/cpp-peglib) | [#121: start rule with ignore operator](https://github.com/yhirose/cpp-peglib/issues/121) | [REJECTED](results/cpp-peglib-121/codex-cli.md) | [REJECTED](results/cpp-peglib-121/claude-code.md) |
 | fmt-4490 | [fmt](https://github.com/fmtlib/fmt) | [#4490: allocator move](https://github.com/fmtlib/fmt/pull/4490) | [REJECTED](results/fmt-4490/codex-cli.md) | [REJECTED](results/fmt-4490/claude-code.md) |
 | fmt-4742 | [fmt](https://github.com/fmtlib/fmt) | [#4742: out-of-bounds read](https://github.com/fmtlib/fmt/pull/4742) | [REJECTED](results/fmt-4742/codex-cli.md) | [REJECTED](results/fmt-4742/claude-code.md) |
@@ -26,7 +26,7 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 | Agent | VERIFIED | REJECTED | REVIEW | NOT_VERIFIABLE | NO_PATCH | ERROR | PENDING |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Codex CLI | 4 | 6 | 0 | 0 | 0 | 0 | 1 |
-| Claude Code | 4 | 6 | 0 | 0 | 0 | 0 | 1 |
+| Claude Code | 4 | 6 | 0 | 1 | 0 | 0 | 0 |
 <!-- results:end -->
 
 The tables are generated from the files in [`results/`](results) by `scripts/render_readme.py`; each agent ran once per case.

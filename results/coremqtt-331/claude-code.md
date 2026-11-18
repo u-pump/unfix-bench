@@ -1,16 +1,20 @@
 # coremqtt-331
 
-Verdict: **PENDING**
+Verdict: **NOT_VERIFIABLE**
 
-Status: no agent fix yet
+Reason: reference test conflicts with agent test edits
 
-Elapsed: pending
+Network: the proxy refused 0 request(s) from the agent run (none); allowed connections: api.anthropic.com x3. Counted from the proxy log; the isolation proof's own requests are excluded.
 
-Verifier: cplus 6967f904db2659e61142591664c0508e81e262c6 · 2026-11-17 23:03:58 UTC (configured; not run)
+Elapsed: 2.2 s
 
-Patch: sha256 pending
+Verifier: cplus 6967f904db2659e61142591664c0508e81e262c6 · 2026-11-17 23:26:29 UTC
 
-Agent: Claude Code · Version: not recorded
+Reference: ctest_module (module core_mqtt_serializer_utest; only tests added by the fix fail on the base)
+
+Patch: sha256 669b364daae0e3525c93012d298824461a10a188381a3728c7148e1f6e57949a
+
+Agent: Claude Code · Version: 2.1.323 (Claude Code)
 
 | Check | Status |
 | --- | --- |
