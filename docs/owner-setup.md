@@ -31,3 +31,7 @@ The [Claude Code workflow](run-claude-code.md) authenticates with an Anthropic A
 If a run ever reports `SECRET FOUND`, delete the key at once, whatever else happened.
 
 Artifacts of this repository are downloadable by anyone who can see it, so a run uploads only files that passed the secret scan and keeps them seven days.
+
+## Codex CLI runs (BENCH-20)
+
+The [Codex CLI workflow](run-codex.md) authenticates with an OpenAI API key, repository secret `OPENAI_API_KEY`. Use a key of a dedicated OpenAI project with a spend limit and nothing else in it, and delete it when the runs are done (deleting the secret does not invalidate the key). The workflow also reads `BENCH_INPUT_TOKEN` (each new case needs its `bench-in-<id>` repository on that token) and `CPLUS_READ_TOKEN` for the verdict. Without `OPENAI_API_KEY` an attempt stops with `auth: OPENAI_API_KEY is not configured`; the probe runs without it.
