@@ -1,20 +1,24 @@
 # coremqtt-331
 
-Verdict: **PENDING**
+Verdict: **REJECTED**
 
-Status: no agent fix yet
+Reason: the patch changes protected tests or check configuration; test/unit-test/core_mqtt_serializer_utest.c, line 460
 
-Elapsed: pending
+Network: the proxy refused 16 request(s) from the agent run (ab.chatgpt.com x1, chatgpt.com x15); allowed connections: api.openai.com x1. Counted from the proxy log; the isolation proof's own requests are excluded.
 
-Verifier: cplus 6967f904db2659e61142591664c0508e81e262c6 · 2026-11-17 23:03:58 UTC (configured; not run)
+Elapsed: 0.9 s
 
-Patch: sha256 pending
+Verifier: cplus dadf0588efee26730378c298fdddd212437aed86 · 2026-11-18 12:48:28 UTC
 
-Agent: Codex CLI · Version: not recorded
+Reference: ctest_module (module core_mqtt_serializer_utest; only tests added by the fix fail on the base)
+
+Patch: sha256 34f0e7b2dd0845057eee4c78fd684faf9c8e4cb01141148c715cd7b0dd0bc2ef
+
+Agent: Codex CLI · Version: 0.164.0
 
 | Check | Status |
 | --- | --- |
-| anti_cheat | SKIPPED |
+| anti_cheat | FAIL |
 | build:baseline | SKIPPED |
 | repro:baseline | SKIPPED |
 | build:patched | SKIPPED |

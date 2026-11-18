@@ -1,10 +1,41 @@
 {
   "name": "Codex CLI",
-  "version": null,
-  "model": null,
-  "invocation": null,
-  "date_utc": null,
-  "environment": null,
-  "patch_sha256": null,
-  "attempt_note": null
+  "version": "0.164.0",
+  "model": "gpt-6-sol",
+  "requested_model": "gpt-6-sol",
+  "model_source": "requested (the Codex transcript does not name the model)",
+  "reasoning": "medium",
+  "date_utc": "2026-11-18T12:47:55Z",
+  "environment": "GitHub Actions ubuntu-latest; agent in a Docker container (read-only root, non-root uid, writable only /work and a tmpfs home, all capabilities dropped); container network is internal and egress goes through a proxy that allows only api.openai.com:443; Codex's own sandbox bypassed (the container is the sandbox), no web search, apps, browser, plugins, hooks or AGENTS.md",
+  "invocation": "codex exec --json --ephemeral --skip-git-repo-check --ignore-user-config --ignore-rules --strict-config --dangerously-bypass-approvals-and-sandbox -c model_reasoning_effort=\"medium\" -c web_search=\"disabled\" -c project_doc_max_bytes=0 --disable apps --disable browser_use --disable computer_use --disable plugins --disable hooks --disable multi_agent --disable image_generation -m gpt-6-sol - (task text on stdin)",
+  "session_id": "01a1eeb2-6cb8-7341-af2d-cd54b9fa5588",
+  "patch_sha256": "34f0e7b2dd0845057eee4c78fd684faf9c8e4cb01141148c715cd7b0dd0bc2ef",
+  "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "metrics": {
+    "bash_commands": 20,
+    "tool_calls": 23,
+    "turns": 1,
+    "duration_seconds": 43,
+    "tokens": {
+      "input": 448858,
+      "cached_input": 413781,
+      "output": 3637,
+      "reasoning_output": 922
+    }
+  },
+  "network_commands_seen_in_transcript": [],
+  "proxy": {
+    "refused_requests": 16,
+    "refused": {
+      "ab.chatgpt.com": 1,
+      "chatgpt.com": 15
+    },
+    "allowed_connections": {
+      "api.openai.com": 1
+    },
+    "scope": "agent run only, counted from the proxy log; the isolation proof's requests are excluded"
+  },
+  "run_url": "https://github.com/u-pump/unfix-bench/actions/runs/44306825972",
+  "image": "sha256:4890c3e923d80b85c5ab355e5c8fd88632b69066dd6dda1ce150509382184551",
+  "network_proof": "all isolation proofs passed before the run; log in the run artifact"
 }
