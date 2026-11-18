@@ -10,6 +10,20 @@
   "session_id": "e6e91e7e-3496-44be-ba7f-a37d4d6de8fd",
   "patch_sha256": "669b364daae0e3525c93012d298824461a10a188381a3728c7148e1f6e57949a",
   "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "verdict_history": [
+    {
+      "verdict": "NOT_VERIFIABLE",
+      "reason": "reference test conflicts with agent test edits",
+      "verifier": "cplus 6967f904db2659e61142591664c0508e81e262c6",
+      "checked_utc": "2026-11-17 23:26:29",
+      "note": "limitation of the verifier, not a verdict on the patch"
+    },
+    {
+      "verdict": "see results/coremqtt-331/claude-code.md",
+      "verifier": "cplus dadf0588efee26730378c298fdddd212437aed86",
+      "note": "same patch (sha256 669b364d...), agent not rerun; verified by the regular path"
+    }
+  ],
   "metrics": {
     "bash_commands": 10,
     "tool_calls": 12,
