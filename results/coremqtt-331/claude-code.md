@@ -6,9 +6,9 @@ Attempt: Same patch (sha256 669b364d...), same single agent run (run 44198931220
 
 Network: the proxy refused 0 request(s) from the agent run (none); allowed connections: api.anthropic.com x3. Counted from the proxy log; the isolation proof's own requests are excluded.
 
-Elapsed: 17.1 s
+Elapsed: 16.3 s
 
-Verifier: cplus dadf0588efee26730378c298fdddd212437aed86 · 2026-11-18 12:05:49 UTC
+Verifier: cplus a69c6524b9680dd349c511de32a628f40e7dc2a2 · 2026-11-19 00:18:10 UTC
 
 Reference: ctest_module (module core_mqtt_serializer_utest; only tests added by the fix fail on the base)
 
