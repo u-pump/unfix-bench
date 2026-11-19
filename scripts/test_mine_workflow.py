@@ -105,6 +105,20 @@ class MineWorkflowPolicyTest(unittest.TestCase):
         self.assertIn("github.actor == 'u-pump'", job("record"))
         self.assertEqual(TEXT.count("timeout-minutes:"), TEXT.count("runs-on:"))
 
+    def test_repos_and_query_are_inputs_and_reach_discover_only_through_env(self) -> None:
+        on = TEXT[TEXT.index("\non:"): TEXT.index("\npermissions:")]
+        for name in ("repos", "query"):
+            self.assertRegex(on, rf"(?m)^      {name}:\n")
+        block = job("discover")
+        self.assertIn("INPUT_REPOS: ${{ inputs.repos }}", block)
+        self.assertIn("INPUT_QUERY: ${{ inputs.query }}", block)
+        self.assertIn('--repos "$INPUT_REPOS" --query "$INPUT_QUERY"', block)
+        self.assertEqual(len(re.findall(r"inputs\.repos|inputs\.query", TEXT)), 2)  # nowhere else, never in a script
+
+    def test_discover_may_wait_for_the_hourly_api_limit(self) -> None:
+        minutes = int(re.search(r"timeout-minutes: (\d+)", job("discover")).group(1))  # type: ignore[union-attr]
+        self.assertGreaterEqual(minutes, 75)  # HttpClient waits up to 60 minutes in total
+
     def test_baseline_time_limit_covers_the_30_minute_build_budget(self) -> None:
         minutes = int(re.search(r"timeout-minutes: (\d+)", job("baseline")).group(1))  # type: ignore[union-attr]
         self.assertGreater(minutes, 30)

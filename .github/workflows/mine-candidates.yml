@@ -23,6 +23,16 @@ on:
         description: 'Explicit list owner/repo#N separated by commas (blank means search the source repositories)'
         required: false
         type: string
+      repos:
+        description: 'Search: owner/repo separated by commas, only repositories of the source (blank means all of them)'
+        required: false
+        default: ''
+        type: string
+      query:
+        description: 'Search: title words, e.g. "fix in:title" (blank means every merged pull request)'
+        required: false
+        default: 'fix in:title'
+        type: string
       since:
         description: 'Search: merged on or after YYYY-MM-DD'
         required: false
@@ -50,7 +60,8 @@ jobs:
   discover:
     if: ${{ github.actor == 'u-pump' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # a long search may wait for the hourly API limit (up to 60 minutes in total, see HttpClient)
+    timeout-minutes: 90
     permissions:
       contents: read
     outputs:
@@ -67,6 +78,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           INPUT_SOURCE: ${{ inputs.source }}
           INPUT_PRS: ${{ inputs.prs }}
+          INPUT_REPOS: ${{ inputs.repos }}
+          INPUT_QUERY: ${{ inputs.query }}
           INPUT_SINCE: ${{ inputs.since }}
           INPUT_MAX_PRS: ${{ inputs.max_prs }}
           INPUT_MAX_CANDIDATES: ${{ inputs.max_candidates }}
@@ -74,6 +87,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/discover"
           args=(--source "$INPUT_SOURCE" --run-url "$RUN_URL" --since "$INPUT_SINCE" \
+                --repos "$INPUT_REPOS" --query "$INPUT_QUERY" \
                 --max-prs "$INPUT_MAX_PRS" --max-candidates "$INPUT_MAX_CANDIDATES" \
                 --out "$RUNNER_TEMP/discover/discovered.json")
           if [ -n "$INPUT_PRS" ]; then args+=(--prs "$INPUT_PRS"); fi

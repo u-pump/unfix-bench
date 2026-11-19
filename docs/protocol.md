@@ -49,7 +49,7 @@ A candidate is accepted only if all of these hold, and every other candidate is 
 1. The upstream test fails on the parent 3 times out of 3 and passes with the fix 3 out of 3; the fix changes source files, not only tests or configuration.
 2. Build and test run without hardware in a Linux container in ≤ 30 minutes, and **without network**: submodules are placed in the frozen snapshot at pinned commits recorded in `case.yaml` (`submodules`: path and commit), and `case.yaml` records `build_network: none`.
 3. The project licence is on the SPDX allowlist (recorded in `case.yaml` and `meta.yaml`) and an issue or PR text exists from which solution hints can be removed.
-4. The fix date is recorded (`fix_date`). `post_cutoff` is true when the fix is dated after 2026-06-30. This is only a date; nothing is claimed about any model's training data. Results of cases with `post_cutoff: true` are shown separately; the target is at least half of the new cases.
+4. The fix date is recorded (`fix_date`). `post_cutoff` is true when the fix is dated after 2026-06-30. This is only a date; nothing is claimed about any model's training data. Results of cases with `post_cutoff: true` are shown separately. For bench v1 fixes merged on or after 2023-01-01 are accepted and the README states for each mined case whether the fix is before or after 2026-06-30; the target of at least half `post_cutoff` cases applies to the way to 100 cases, not to v1 (DECISIONS.md).
 5. Backports of one change count once (`dedupe_key`).
 6. No project, and no organisation family (all FreeRTOS repositories are one family), provides more than 30% of the 100 cases.
 7. `fuzz_origin` is set only when the commit or issue directly refers to a fuzzer or OSS-Fuzz; otherwise it is `null`.

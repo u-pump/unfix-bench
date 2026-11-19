@@ -5,9 +5,12 @@ the rest of each response is reduced to the fields discover.py reads."""
 
 from __future__ import annotations
 
+import email.message
+import io
 import json
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
 from typing import Any
 
@@ -168,6 +171,124 @@ class DiscoverTest(unittest.TestCase):
     def test_unknown_source_is_an_error(self) -> None:
         with self.assertRaises(ValueError):
             discover.discover(FakeClient({}), source="nope", miner_run=RUN, root=Path("."), refs=[])
+
+
+def http_error(code: int, headers: dict[str, str], body: str = "{}") -> urllib.error.HTTPError:
+    message = email.message.Message()
+    for key, value in headers.items():
+        message[key] = value
+    return urllib.error.HTTPError("https://api.github.com/x", code, "err", message, io.BytesIO(body.encode()))
+
+
+class Response(io.BytesIO):
+    def __enter__(self) -> "Response":
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        return None
+
+
+class RateLimitTest(unittest.TestCase):
+    """HttpClient waits for the limit named in the headers and repeats the request; the clock and the network are fake."""
+
+    def client(self, answers: list[Any], now: float = 1000.0, max_wait: float = 3600.0) -> tuple[discover.HttpClient, list[float]]:
+        sleeps: list[float] = []
+        queue = list(answers)
+
+        def opener(request: Any, timeout: int = 0) -> Response:
+            answer = queue.pop(0)
+            if isinstance(answer, Exception):
+                raise answer
+            return Response(json.dumps(answer).encode())
+
+        return discover.HttpClient("t", max_wait=max_wait, sleep=sleeps.append, now=lambda: now, opener=opener), sleeps
+
+    def test_the_primary_limit_waits_until_the_reset_header_and_repeats(self) -> None:
+        limited = http_error(403, {"x-ratelimit-remaining": "0", "x-ratelimit-reset": "1120"})
+        client, sleeps = self.client([limited, {"ok": 1}])
+        self.assertEqual(client.get("/x"), {"ok": 1})
+        self.assertEqual(sleeps, [121.0])
+
+    def test_a_secondary_limit_waits_for_retry_after(self) -> None:
+        client, sleeps = self.client([http_error(429, {"retry-after": "30"}), {"ok": 1}])
+        self.assertEqual(client.get("/x"), {"ok": 1})
+        self.assertEqual(sleeps, [31.0])
+
+    def test_a_secondary_limit_without_headers_waits_a_minute(self) -> None:
+        client, sleeps = self.client([http_error(403, {}, '{"message": "You have exceeded a secondary rate limit"}'), {"ok": 1}])
+        self.assertEqual(client.get("/x"), {"ok": 1})
+        self.assertEqual(sleeps, [60.0])
+
+    def test_a_wait_over_the_budget_is_an_error_and_nothing_sleeps(self) -> None:
+        limited = http_error(403, {"x-ratelimit-remaining": "0", "x-ratelimit-reset": "9000"})
+        client, sleeps = self.client([limited], max_wait=3600)
+        with self.assertRaisesRegex(discover.GitHubError, "rate limit"):
+            client.get("/x")
+        self.assertEqual(sleeps, [])
+
+    def test_the_waits_of_one_client_add_up_against_the_budget(self) -> None:
+        def limited() -> urllib.error.HTTPError:
+            return http_error(403, {"x-ratelimit-remaining": "0", "x-ratelimit-reset": "2800"})
+
+        client, sleeps = self.client([limited(), {"ok": 1}, limited()], max_wait=2000)
+        client.get("/x")
+        with self.assertRaises(discover.GitHubError):
+            client.get("/y")
+        self.assertEqual(len(sleeps), 1)
+
+    def test_a_forbidden_that_is_not_a_limit_and_other_errors_fail_at_once(self) -> None:
+        for error in (http_error(403, {"x-ratelimit-remaining": "57"}, '{"message": "Resource not accessible"}'),
+                      http_error(404, {}), http_error(422, {})):
+            with self.subTest(error.code):
+                client, sleeps = self.client([error])
+                with self.assertRaises(discover.GitHubError):
+                    client.get("/x")
+                self.assertEqual(sleeps, [])
+
+    def test_it_does_not_wait_forever(self) -> None:
+        client, sleeps = self.client([http_error(429, {"retry-after": "1"}) for _ in range(discover.HttpClient.MAX_RETRIES + 1)])
+        with self.assertRaises(discover.GitHubError):
+            client.get("/x")
+        self.assertEqual(len(sleeps), discover.HttpClient.MAX_RETRIES)
+
+
+class InputChecksTest(unittest.TestCase):
+    def test_query_allows_title_words_and_nothing_that_changes_the_scope(self) -> None:
+        for good in ("", "fix in:title", "fix OR bug OR overflow in:title", "NOT docs in:title", "label:bug"):
+            with self.subTest(good):
+                self.assertEqual(discover.check_query(good), good)
+        for bad in ("repo:evil/x", "org:FreeRTOS", "is:open", "merged:>=2020-01-01", "a;b", "fix $(id)", "fix`x`",
+                    "in:path", "x" * 201):
+            with self.subTest(bad):
+                with self.assertRaises(ValueError):
+                    discover.check_query(bad)
+
+    def test_repos_must_belong_to_the_source(self) -> None:
+        self.assertEqual(discover.check_repos("freertos", [MQTT, TCP]), [MQTT, TCP])
+        self.assertEqual(discover.check_repos("freertos", []), [])
+        for bad in ("evil/coreMQTT", "FreeRTOS/FreeRTOS", "FreeRTOS/coremqtt", "../x"):
+            with self.subTest(bad):
+                with self.assertRaises(ValueError):
+                    discover.check_repos("freertos", [bad])
+
+    def test_the_command_line_checks_them_before_any_request(self) -> None:
+        base = ["--source", "freertos", "--run-url", RUN, "--out", "x.json"]
+        for extra in (["--query", "repo:evil/x"], ["--max-prs", "0"], ["--max-prs", "1001"]):
+            with self.subTest(extra):
+                with self.assertRaises(SystemExit):
+                    discover.main(base + extra)
+        with tempfile.TemporaryDirectory() as tmp:
+            for repos in ("evil/x", f"{MQTT},evil/x"):
+                with self.subTest(repos):  # an error exit before the client is built
+                    self.assertEqual(discover.main(["--source", "freertos", "--run-url", RUN, "--repos", repos,
+                                                    "--out", str(Path(tmp) / "x.json")]), 1)
+
+    def test_an_empty_query_searches_every_merged_pull_request(self) -> None:
+        client = FakeClient({"/search/issues": [{"number": 383}]})
+        self.assertEqual(discover.search_merged(client, MQTT, "2023-01-01", 10, ""), [383])
+        self.assertEqual(client.calls[0][1]["q"], f"repo:{MQTT} is:pr is:merged merged:>=2023-01-01")
+        discover.search_merged(client, MQTT, "2023-01-01", 10, "fix OR bug in:title")
+        self.assertTrue(client.calls[1][1]["q"].endswith("merged:>=2023-01-01 fix OR bug in:title"))
 
 
 class CommandLineTest(unittest.TestCase):

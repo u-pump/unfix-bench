@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -73,6 +74,16 @@ class RenderReadmeTest(unittest.TestCase):
                 write(results, case, "claude-code", "MAYBE")
             with self.assertRaises(ValueError):
                 render_readme.render(README, results)
+
+    def test_the_readme_states_before_or_after_the_cutoff_for_every_case_with_a_fix_date(self) -> None:
+        readme = (render_readme.ROOT / "README.md").read_text(encoding="utf-8")
+        metas = sorted((render_readme.ROOT / "cases").glob("*/meta.yaml"))
+        self.assertTrue(metas)
+        for path in metas:
+            meta = json.loads(path.read_text(encoding="utf-8"))
+            line = next((x for x in readme.splitlines() if f"{path.parent.name}: fix {meta['fix_date']}" in x), "")
+            wanted = "fix after 2026-06-30" if meta["post_cutoff"] else "fix before 2026-06-30"
+            self.assertIn(wanted, line, f"README must say '{wanted}' for {path.parent.name}")
 
     def test_committed_readme_matches_committed_results(self) -> None:
         readme = (render_readme.ROOT / "README.md").read_bytes().decode("utf-8").replace("\r\n", "\n")
