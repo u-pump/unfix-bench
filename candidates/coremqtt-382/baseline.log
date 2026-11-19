@@ -1,0 +1,19 @@
+=== base: build exit 0
+=== base run 1: 5 ctest tests, failed: core_mqtt_prop_serializer_utest, core_mqtt_utest
+    core_mqtt_prop_serializer_utest: failing functions: test_MQTTPropAdd_ReasonString_BufferTooSmall
+    core_mqtt_utest: failing functions: test_MQTT_Subscribe_MultipleSubscriptions, test_MQTT_Unsubscribe_MultipleSubscriptions
+=== base run 2: 5 ctest tests, failed: core_mqtt_prop_serializer_utest, core_mqtt_utest
+    core_mqtt_prop_serializer_utest: failing functions: test_MQTTPropAdd_ReasonString_BufferTooSmall
+    core_mqtt_utest: failing functions: test_MQTT_Subscribe_MultipleSubscriptions, test_MQTT_Unsubscribe_MultipleSubscriptions
+=== base run 3: 5 ctest tests, failed: core_mqtt_prop_serializer_utest, core_mqtt_utest
+    core_mqtt_prop_serializer_utest: failing functions: test_MQTTPropAdd_ReasonString_BufferTooSmall
+    core_mqtt_utest: failing functions: test_MQTT_Subscribe_MultipleSubscriptions, test_MQTT_Unsubscribe_MultipleSubscriptions
+=== fix: build exit 0
+=== fix run 1: 5 ctest tests, failed: core_mqtt_utest
+    core_mqtt_utest: failing functions: test_MQTT_Subscribe_MultipleSubscriptions, test_MQTT_Unsubscribe_MultipleSubscriptions
+=== fix run 2: 5 ctest tests, failed: core_mqtt_utest
+    core_mqtt_utest: failing functions: test_MQTT_Subscribe_MultipleSubscriptions, test_MQTT_Unsubscribe_MultipleSubscriptions
+=== fix run 3: 5 ctest tests, failed: core_mqtt_utest
+    core_mqtt_utest: failing functions: test_MQTT_Subscribe_MultipleSubscriptions, test_MQTT_Unsubscribe_MultipleSubscriptions
+=== verdict: {"accepted": true, "bug_test": "test_MQTTPropAdd_ReasonString_BufferTooSmall", "bug_test_granularity": "ctest_module", "module": "core_mqtt_prop_serializer_utest", "module_other_tests": "3/3 pass", "reference_functions": ["test_MQTTPropAdd_ReasonString_BufferTooSmall"]}
+=== elapsed 15.4s

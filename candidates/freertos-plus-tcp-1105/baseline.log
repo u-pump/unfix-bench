@@ -1,0 +1,17 @@
+=== base: build exit 0
+=== base run 1: 60 ctest tests, failed: FreeRTOS_ARP_DataLenLessThanMinPacket_utest, FreeRTOS_ARP_utest
+    FreeRTOS_ARP_DataLenLessThanMinPacket_utest: failing functions: test_FreeRTOS_OutputARPRequest_MinimumPacketSizeLessThanARPPacket
+    FreeRTOS_ARP_utest: failing functions: test_FreeRTOS_OutputARPRequest, test_FreeRTOS_OutputARPRequest_NullEndpoint, test_eARPProcessPacket_Reply_SenderAndTargetSame, test_eARPProcessPacket_Request_SenderAndTargetSame, test_vARPAgeCache, test_xARPWaitResolution, test_xARPWaitResolution_GNWFailsNoTimeout, test_xCheckRequiresARPResolution_OnLocalNetwork_NotInCache
+=== base run 2: 60 ctest tests, failed: FreeRTOS_ARP_DataLenLessThanMinPacket_utest, FreeRTOS_ARP_utest
+    FreeRTOS_ARP_DataLenLessThanMinPacket_utest: failing functions: test_FreeRTOS_OutputARPRequest_MinimumPacketSizeLessThanARPPacket
+    FreeRTOS_ARP_utest: failing functions: test_FreeRTOS_OutputARPRequest, test_FreeRTOS_OutputARPRequest_NullEndpoint, test_eARPProcessPacket_Reply_SenderAndTargetSame, test_eARPProcessPacket_Request_SenderAndTargetSame, test_vARPAgeCache, test_xARPWaitResolution, test_xARPWaitResolution_GNWFailsNoTimeout, test_xCheckRequiresARPResolution_OnLocalNetwork_NotInCache
+=== base run 3: 60 ctest tests, failed: FreeRTOS_ARP_DataLenLessThanMinPacket_utest, FreeRTOS_ARP_utest
+    FreeRTOS_ARP_DataLenLessThanMinPacket_utest: failing functions: test_FreeRTOS_OutputARPRequest_MinimumPacketSizeLessThanARPPacket
+    FreeRTOS_ARP_utest: failing functions: test_FreeRTOS_OutputARPRequest, test_FreeRTOS_OutputARPRequest_NullEndpoint, test_eARPProcessPacket_Reply_SenderAndTargetSame, test_eARPProcessPacket_Request_SenderAndTargetSame, test_vARPAgeCache, test_xARPWaitResolution, test_xARPWaitResolution_GNWFailsNoTimeout, test_xCheckRequiresARPResolution_OnLocalNetwork_NotInCache
+=== fix: build exit 0
+=== fix run 1: 60 ctest tests, failed: none
+=== fix run 2: 60 ctest tests, failed: none
+=== fix run 3: 60 ctest tests, failed: FreeRTOS_ARP_utest
+    FreeRTOS_ARP_utest: failing functions: unknown
+=== verdict: {"accepted": true, "bug_test": "test_FreeRTOS_OutputARPRequest_MinimumPacketSizeLessThanARPPacket", "bug_test_granularity": "ctest_module", "module": "FreeRTOS_ARP_DataLenLessThanMinPacket_utest", "module_other_tests": "3/3 pass", "reference_functions": ["test_FreeRTOS_OutputARPRequest_MinimumPacketSizeLessThanARPPacket"]}
+=== elapsed 234.9s

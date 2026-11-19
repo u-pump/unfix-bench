@@ -1,0 +1,16 @@
+=== base: build exit 0
+=== base run 1: 60 ctest tests, failed: FreeRTOS_DNS_utest
+    FreeRTOS_DNS_utest: failing functions: test_FreeRTOS_getaddrinfo_a_IPv4Random_LLMNRDNSUnknownPreference, test_FreeRTOS_getaddrinfo_a_IPv4Random_LocalDNSUnknownPreference
+=== base run 2: 60 ctest tests, failed: FreeRTOS_ARP_utest, FreeRTOS_DNS_utest
+    FreeRTOS_ARP_utest: failing functions: unknown
+    FreeRTOS_DNS_utest: failing functions: test_FreeRTOS_getaddrinfo_a_IPv4Random_LLMNRDNSUnknownPreference, test_FreeRTOS_getaddrinfo_a_IPv4Random_LocalDNSUnknownPreference
+=== base run 3: 60 ctest tests, failed: FreeRTOS_ARP_utest, FreeRTOS_DNS_utest
+    FreeRTOS_ARP_utest: failing functions: unknown
+    FreeRTOS_DNS_utest: failing functions: test_FreeRTOS_getaddrinfo_a_IPv4Random_LLMNRDNSUnknownPreference, test_FreeRTOS_getaddrinfo_a_IPv4Random_LocalDNSUnknownPreference
+=== fix: build exit 0
+=== fix run 1: 60 ctest tests, failed: none
+=== fix run 2: 60 ctest tests, failed: FreeRTOS_ARP_utest
+    FreeRTOS_ARP_utest: failing functions: unknown
+=== fix run 3: 60 ctest tests, failed: none
+=== verdict: {"accepted": true, "bug_test": "test_FreeRTOS_getaddrinfo_a_IPv4Random_LocalDNSUnknownPreference", "bug_test_granularity": "ctest_module", "module": "FreeRTOS_DNS_utest", "module_other_tests": "3/3 pass", "reference_functions": ["test_FreeRTOS_getaddrinfo_a_IPv4Random_LocalDNSUnknownPreference", "test_FreeRTOS_getaddrinfo_a_IPv4Random_LLMNRDNSUnknownPreference"]}
+=== elapsed 158.3s

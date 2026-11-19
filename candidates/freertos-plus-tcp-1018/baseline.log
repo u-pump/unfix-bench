@@ -1,0 +1,13 @@
+=== base: build exit 0
+=== base run 1: 63 ctest tests, failed: FreeRTOS_Sockets_TCP_API_utest
+    FreeRTOS_Sockets_TCP_API_utest: failing functions: test_FreeRTOS_send_IPTaskWithNULLBuffer, test_FreeRTOS_send_IPTaskWithNULLBuffer_LessSpaceInStreamBuffer
+=== base run 2: 63 ctest tests, failed: FreeRTOS_Sockets_TCP_API_utest
+    FreeRTOS_Sockets_TCP_API_utest: failing functions: test_FreeRTOS_send_IPTaskWithNULLBuffer, test_FreeRTOS_send_IPTaskWithNULLBuffer_LessSpaceInStreamBuffer
+=== base run 3: 63 ctest tests, failed: FreeRTOS_Sockets_TCP_API_utest
+    FreeRTOS_Sockets_TCP_API_utest: failing functions: test_FreeRTOS_send_IPTaskWithNULLBuffer, test_FreeRTOS_send_IPTaskWithNULLBuffer_LessSpaceInStreamBuffer
+=== fix: build exit 0
+=== fix run 1: 63 ctest tests, failed: none
+=== fix run 2: 63 ctest tests, failed: none
+=== fix run 3: 63 ctest tests, failed: none
+=== verdict: {"accepted": true, "bug_test": "test_FreeRTOS_send_IPTaskWithNULLBuffer", "bug_test_granularity": "ctest_module", "module": "FreeRTOS_Sockets_TCP_API_utest", "module_other_tests": "3/3 pass", "reference_functions": ["test_FreeRTOS_send_IPTaskWithNULLBuffer", "test_FreeRTOS_send_IPTaskWithNULLBuffer_LessSpaceInStreamBuffer"]}
+=== elapsed 205.7s

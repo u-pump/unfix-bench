@@ -1,0 +1,13 @@
+=== base: build exit 0
+=== base run 1: 60 ctest tests, failed: FreeRTOS_DNS_Parser_utest
+    FreeRTOS_DNS_Parser_utest: failing functions: test_parseDNSAnswer_recordNOTstored_gt_count_diffUsType
+=== base run 2: 60 ctest tests, failed: FreeRTOS_DNS_Parser_utest
+    FreeRTOS_DNS_Parser_utest: failing functions: test_parseDNSAnswer_recordNOTstored_gt_count_diffUsType
+=== base run 3: 60 ctest tests, failed: FreeRTOS_DNS_Parser_utest
+    FreeRTOS_DNS_Parser_utest: failing functions: test_parseDNSAnswer_recordNOTstored_gt_count_diffUsType
+=== fix: build exit 0
+=== fix run 1: 60 ctest tests, failed: none
+=== fix run 2: 60 ctest tests, failed: none
+=== fix run 3: 60 ctest tests, failed: none
+=== verdict: {"accepted": true, "bug_test": "test_parseDNSAnswer_recordNOTstored_gt_count_diffUsType", "bug_test_granularity": "ctest_module", "module": "FreeRTOS_DNS_Parser_utest", "module_other_tests": "3/3 pass", "reference_functions": ["test_parseDNSAnswer_recordNOTstored_gt_count_diffUsType"]}
+=== elapsed 252.7s

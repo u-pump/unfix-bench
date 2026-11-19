@@ -1,0 +1,16 @@
+=== base: build exit 0
+=== base run 1: 60 ctest tests, failed: FreeRTOS_IP_utest, FreeRTOS_ND_utest
+    FreeRTOS_IP_utest: failing functions: unknown
+    FreeRTOS_ND_utest: failing functions: test_prvProcessICMPMessage_IPv6_NeighborSolicitation, test_prvProcessICMPMessage_IPv6_NeighborSolicitationCorrectLen, test_prvProcessICMPMessage_IPv6_NeighborSolicitationIncorrectLen, test_prvProcessICMPMessage_IPv6_NeighborSolicitationNullEP
+=== base run 2: 60 ctest tests, failed: FreeRTOS_IP_utest, FreeRTOS_ND_utest
+    FreeRTOS_IP_utest: failing functions: unknown
+    FreeRTOS_ND_utest: failing functions: test_prvProcessICMPMessage_IPv6_NeighborSolicitation, test_prvProcessICMPMessage_IPv6_NeighborSolicitationCorrectLen, test_prvProcessICMPMessage_IPv6_NeighborSolicitationIncorrectLen, test_prvProcessICMPMessage_IPv6_NeighborSolicitationNullEP
+=== base run 3: 60 ctest tests, failed: FreeRTOS_IP_utest, FreeRTOS_ND_utest
+    FreeRTOS_IP_utest: failing functions: unknown
+    FreeRTOS_ND_utest: failing functions: test_prvProcessICMPMessage_IPv6_NeighborSolicitation, test_prvProcessICMPMessage_IPv6_NeighborSolicitationCorrectLen, test_prvProcessICMPMessage_IPv6_NeighborSolicitationIncorrectLen, test_prvProcessICMPMessage_IPv6_NeighborSolicitationNullEP
+=== fix: build exit 0
+=== fix run 1: 60 ctest tests, failed: none
+=== fix run 2: 60 ctest tests, failed: none
+=== fix run 3: 60 ctest tests, failed: none
+=== verdict: {"accepted": true, "bug_test": "test_prvProcessICMPMessage_IPv6_NeighborSolicitationNullEP", "bug_test_granularity": "ctest_module", "module": "FreeRTOS_ND_utest", "module_other_tests": "3/3 pass", "reference_functions": ["test_prvProcessICMPMessage_IPv6_NeighborSolicitationNullEP", "test_prvProcessICMPMessage_IPv6_NeighborSolicitationIncorrectLen", "test_prvProcessICMPMessage_IPv6_NeighborSolicitationCorrectLen", "test_prvProcessICMPMessage_IPv6_NeighborSolicitation"]}
+=== elapsed 206.3s

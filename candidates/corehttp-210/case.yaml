@@ -1,0 +1,34 @@
+{
+  "id": "corehttp-210",
+  "repo": "https://github.com/FreeRTOS/coreHTTP.git",
+  "base": "8dfc2f58dab35b1cb14a3f7eaee1210c144151c1",
+  "upstream_fix": "9cf8c78a17721193795d77de6f006162132a8991",
+  "bug_test": "test_HTTPClient_Send_parse_complete_header_field_at_read_boundary",
+  "reference_selection": "first function added or changed by the upstream diff that fails 3/3 on the base; the reference is the whole ctest test core_http_send_utest (ctest_module), no function filter exists",
+  "reference_selection_note": "ctest test core_http_send_utest; changed functions: test_HTTPClient_Send_parse_complete_header_field_at_read_boundary",
+  "issue_url": "https://github.com/FreeRTOS/coreHTTP/pull/210",
+  "fix_url": "https://github.com/FreeRTOS/coreHTTP/commit/9cf8c78a17721193795d77de6f006162132a8991",
+  "license": "MIT",
+  "category": "unclassified (the owner sets it)",
+  "build": "cmake -S test -B build -DCMAKE_BUILD_TYPE=Debug -DUNITTEST=1 -DBUILD_CLONE_SUBMODULES=OFF && cmake --build build -j2",
+  "test": "ctest --test-dir build -R '^core_http_send_utest$' --output-on-failure",
+  "bug_test_granularity": "ctest_module",
+  "build_network": "none",
+  "verifier_revision": "a69c6524b9680dd349c511de32a628f40e7dc2a2",
+  "module_other_tests": "3/3 pass",
+  "submodules": [
+    {
+      "commit": "4fce8cac9433aa4728428bb3b26880d32ad05c88",
+      "path": "source/dependency/3rdparty/llhttp"
+    },
+    {
+      "commit": "9d092898ef26ece140d9225e037274b64d4f851e",
+      "path": "test/unit-test/CMock"
+    }
+  ],
+  "baseline_reproduction": {
+    "verdict": "REPRODUCED",
+    "runs": "3/3",
+    "elapsed_s": 14.1
+  }
+}

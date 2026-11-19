@@ -1,0 +1,11 @@
+{
+  "source": "freertos",
+  "spdx": "MIT",
+  "fix_date": "2026-08-13",
+  "post_cutoff": true,
+  "upstream_pr": "https://github.com/FreeRTOS/coreMQTT/pull/382",
+  "fuzz_origin": null,
+  "dedupe_key": "FreeRTOS/coreMQTT:fix-property-serialization-bounds-checks",
+  "mined_run_url": "https://github.com/u-pump/unfix-bench/actions/runs/44512908215",
+  "miner_version": "bench-20-pr6"
+}
