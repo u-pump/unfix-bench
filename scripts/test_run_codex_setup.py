@@ -60,7 +60,7 @@ class WorkflowTest(unittest.TestCase):
             data = json.loads(path.read_text(encoding="utf-8"))
             if data.get("version"):
                 recorded.append((data["version"], data["model"], data["reasoning"]))
-        self.assertEqual(len(recorded), 10)
+        self.assertEqual(len(recorded), 11)  # ten first cases and coremqtt-331 (same model, effort and version)
         self.assertEqual({(model, effort) for _, model, effort in recorded}, {("gpt-6-sol", "medium")})
         newest = max((tuple(int(x) for x in version.split(".")), version) for version, _, _ in recorded)[1]
         self.assertIn(f"ARG CODEX_CLI_VERSION={newest}", DOCKERFILE)  # eight cases used it, two used 0.163.0

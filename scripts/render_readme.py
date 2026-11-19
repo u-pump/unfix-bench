@@ -19,7 +19,9 @@ AGENTS = {"Codex CLI": "codex-cli", "Claude Code": "claude-code"}
 VERDICTS = ("VERIFIED", "REJECTED", "REVIEW", "NOT_VERIFIABLE", "NO_PATCH", "ERROR", "PENDING")
 LABELS = {"INFRASTRUCTURE_ERROR": "ERROR"}
 VERDICT_LINE = re.compile(r"(?m)^Verdict: \*\*([A-Z_]+)\*\*")
-ROW = re.compile(r"^\| ([a-z0-9-]+) \| (.+?) \| (.+?) \| \[[A-Z_]+\]\(results/.+\) \|.*\|$")
+# A footnote reference ([^1]) written after a verdict cell is kept when the cell is regenerated.
+MARK = r"((?:\[\^[0-9]+\])*)"
+ROW = re.compile(r"^\| ([a-z0-9-]+) \| (.+?) \| (.+?) \| \[[A-Z_]+\]\(results/.+\)(?:\[\^[0-9]+\])* \|.*\|$")
 
 
 def verdict_of(results: Path, case_id: str, agent_id: str) -> str:
@@ -47,7 +49,8 @@ def render_block(block: str, results: Path) -> str:
         for agent in agents:
             label = verdict_of(results, case_id, agent)
             counts[agent][label] += 1
-            cells.append(f"[{label}](results/{case_id}/{agent}.md)")
+            kept = re.search(rf"\]\(results/{re.escape(case_id)}/{agent}\.md\){MARK}", row[0])
+            cells.append(f"[{label}](results/{case_id}/{agent}.md)" + (kept[1] if kept else ""))
         out.append(f"| {case_id} | {row[2]} | {row[3]} | " + " | ".join(cells) + " |")
     totals = ["", "| Agent | " + " | ".join(VERDICTS) + " |", "| --- | " + " | ".join("---:" for _ in VERDICTS) + " |"]
     for name, agent in zip(columns, agents, strict=True):

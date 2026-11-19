@@ -11,9 +11,9 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 <!-- results:start -->
 | Case | Project | Bug | Codex CLI | Claude Code |
 | --- | --- | --- | --- | --- |
-| coremqtt-331 | [coreMQTT](https://github.com/FreeRTOS/coreMQTT) | [#331: zero-length client identifier](https://github.com/FreeRTOS/coreMQTT/pull/331) | [PENDING](results/coremqtt-331/codex-cli.md) | [NOT_VERIFIABLE](results/coremqtt-331/claude-code.md) |
+| coremqtt-331 | [coreMQTT](https://github.com/FreeRTOS/coreMQTT) | [#331: zero-length client identifier](https://github.com/FreeRTOS/coreMQTT/pull/331) | [REJECTED](results/coremqtt-331/codex-cli.md) | [VERIFIED](results/coremqtt-331/claude-code.md) |
 | cpp-peglib-121 | [cpp-peglib](https://github.com/yhirose/cpp-peglib) | [#121: start rule with ignore operator](https://github.com/yhirose/cpp-peglib/issues/121) | [REJECTED](results/cpp-peglib-121/codex-cli.md) | [REJECTED](results/cpp-peglib-121/claude-code.md) |
-| fmt-4490 | [fmt](https://github.com/fmtlib/fmt) | [#4490: allocator move](https://github.com/fmtlib/fmt/pull/4490) | [REJECTED](results/fmt-4490/codex-cli.md) | [REJECTED](results/fmt-4490/claude-code.md) |
+| fmt-4490 | [fmt](https://github.com/fmtlib/fmt) | [#4490: allocator move](https://github.com/fmtlib/fmt/pull/4490) | [REJECTED](results/fmt-4490/codex-cli.md) | [REJECTED](results/fmt-4490/claude-code.md)[^1] |
 | fmt-4742 | [fmt](https://github.com/fmtlib/fmt) | [#4742: out-of-bounds read](https://github.com/fmtlib/fmt/pull/4742) | [REJECTED](results/fmt-4742/codex-cli.md) | [REJECTED](results/fmt-4742/claude-code.md) |
 | fmt-4800 | [fmt](https://github.com/fmtlib/fmt) | [#4800: positional width and precision](https://github.com/fmtlib/fmt/pull/4800) | [VERIFIED](results/fmt-4800/codex-cli.md) | [VERIFIED](results/fmt-4800/claude-code.md) |
 | fmt-4933 | [fmt](https://github.com/fmtlib/fmt) | [#4933: named argument count](https://github.com/fmtlib/fmt/pull/4933) | [REJECTED](results/fmt-4933/codex-cli.md) | [REJECTED](results/fmt-4933/claude-code.md) |
@@ -25,9 +25,11 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 
 | Agent | VERIFIED | REJECTED | REVIEW | NOT_VERIFIABLE | NO_PATCH | ERROR | PENDING |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Codex CLI | 4 | 6 | 0 | 0 | 0 | 0 | 1 |
-| Claude Code | 4 | 6 | 0 | 1 | 0 | 0 | 0 |
+| Codex CLI | 4 | 7 | 0 | 0 | 0 | 0 | 0 |
+| Claude Code | 5 | 6 | 0 | 0 | 0 | 0 | 0 |
 <!-- results:end -->
+
+[^1]: По правилу анти-чита с cplus a69c652 этот патч получил бы REVIEW вместо FAIL на анти-чите; результат оставлен на исходной ревизии 81c0fda по протоколу (первые 20 результатов не перепроверяются).
 
 The tables are generated from the files in [`results/`](results) by `scripts/render_readme.py`; each agent ran once per case.
 
@@ -85,7 +87,7 @@ The focused command above runs the selected `bug_test`; the CTest command runs t
 
 ## Limits
 
-- Eleven cases are a small sample; seven are from fmt. The eleventh, coremqtt-331, has not been run by either agent (PENDING); it is the first Unity case and is judged by cplus.
+- Eleven cases are a small sample; seven are from fmt. The eleventh, coremqtt-331, is the first Unity case and is judged by cplus; both agents ran once, and both patches were checked again after the verifier revision moved to `a69c652` (the agents were not rerun, see [DECISIONS](docs/DECISIONS.md)).
 - In fmt-4960, the reference test was chosen after the agent run. The selection rule was applied retrospectively and documented in [the case file](cases/fmt-4960/case.yaml); the patch was never edited.
 - The verifier is not open source yet. Public reports contain the verdict, eight check statuses, and elapsed time.
 - Each result names the verifier revision it was made with (the `Verifier:` line). All 20 results of the first ten cases were made with `81c0fda` and are not re-checked; cases added later are pinned to a newer revision, shown in their own results.

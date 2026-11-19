@@ -1,0 +1,80 @@
+diff --git a/source/core_mqtt_serializer.c b/source/core_mqtt_serializer.c
+index 7298176..49ab9f4 100644
+--- a/source/core_mqtt_serializer.c
++++ b/source/core_mqtt_serializer.c
+@@ -1706,9 +1706,11 @@ MQTTStatus_t MQTT_GetConnectPacketSize( const MQTTConnectInfo_t * pConnectInfo,
+                     ( void * ) pPacketSize ) );
+         status = MQTTBadParameter;
+     }
+-    else if( ( pConnectInfo->clientIdentifierLength == 0U ) || ( pConnectInfo->pClientIdentifier == NULL ) )
++    else if( ( ( pConnectInfo->clientIdentifierLength == 0U ) && ( pConnectInfo->cleanSession == false ) ) ||
++             ( ( pConnectInfo->clientIdentifierLength != 0U ) &&
++               ( ( pConnectInfo->pClientIdentifier == NULL ) || ( pConnectInfo->pClientIdentifier[ 0 ] == '\0' ) ) ) )
+     {
+-        LogError( ( "Mqtt_GetConnectPacketSize() client identifier must be set." ) );
++        LogError( ( "MQTT_GetConnectPacketSize() client identifier is invalid." ) );
+         status = MQTTBadParameter;
+     }
+     else if( ( pWillInfo != NULL ) && ( pWillInfo->payloadLength > ( size_t ) UINT16_MAX ) )
+diff --git a/test/unit-test/core_mqtt_serializer_utest.c b/test/unit-test/core_mqtt_serializer_utest.c
+index c359e29..30b99a3 100644
+--- a/test/unit-test/core_mqtt_serializer_utest.c
++++ b/test/unit-test/core_mqtt_serializer_utest.c
+@@ -457,17 +457,32 @@ void test_MQTT_GetConnectPacketSize( void )
+     status = MQTT_GetConnectPacketSize( &connectInfo, NULL, &remainingLength, &packetSize );
+     TEST_ASSERT_EQUAL_INT( MQTTBadParameter, status );
+ 
+-    /* Verify empty client identifier fails. */
++    /* A zero-length identifier requires a clean session. */
+     connectInfo.pClientIdentifier = CLIENT_IDENTIFIER;
+     connectInfo.clientIdentifierLength = 0;
+     status = MQTT_GetConnectPacketSize( &connectInfo, NULL, &remainingLength, &packetSize );
+     TEST_ASSERT_EQUAL_INT( MQTTBadParameter, status );
+ 
++    connectInfo.cleanSession = true;
++    connectInfo.pClientIdentifier = NULL;
++    status = MQTT_GetConnectPacketSize( &connectInfo, NULL, &remainingLength, &packetSize );
++    TEST_ASSERT_EQUAL_INT( MQTTSuccess, status );
++    TEST_ASSERT_EQUAL_INT( 12, remainingLength );
++    TEST_ASSERT_EQUAL_INT( 14, packetSize );
++
++    connectInfo.pClientIdentifier = "";
++    status = MQTT_GetConnectPacketSize( &connectInfo, NULL, &remainingLength, &packetSize );
++    TEST_ASSERT_EQUAL_INT( MQTTSuccess, status );
++
+     connectInfo.pClientIdentifier = NULL;
+     connectInfo.clientIdentifierLength = CLIENT_IDENTIFIER_LENGTH;
+     status = MQTT_GetConnectPacketSize( &connectInfo, NULL, &remainingLength, &packetSize );
+     TEST_ASSERT_EQUAL_INT( MQTTBadParameter, status );
+ 
++    connectInfo.pClientIdentifier = "";
++    status = MQTT_GetConnectPacketSize( &connectInfo, NULL, &remainingLength, &packetSize );
++    TEST_ASSERT_EQUAL_INT( MQTTBadParameter, status );
++
+     /* Test a will message payload length that is too large. */
+     memset( &connectInfo, 0x0, sizeof( connectInfo ) );
+     connectInfo.pClientIdentifier = CLIENT_IDENTIFIER;
+@@ -573,8 +588,22 @@ void test_MQTT_SerializeConnect( void )
+     TEST_ASSERT_EQUAL_INT( MQTTSuccess, status );
+     checkBufferOverflow( buffer, sizeof( buffer ) );
+ 
+-    /* Encode user name. Also try clean session. */
++    /* A clean session can serialize a zero-length client identifier. */
+     connectInfo.cleanSession = true;
++    connectInfo.pClientIdentifier = NULL;
++    connectInfo.clientIdentifierLength = 0;
++    status = MQTT_GetConnectPacketSize( &connectInfo, NULL, &remainingLength, &packetSize );
++    TEST_ASSERT_EQUAL_INT( MQTTSuccess, status );
++    padAndResetBuffer( buffer, sizeof( buffer ) );
++    status = MQTT_SerializeConnect( &connectInfo, NULL, remainingLength, &fixedBuffer );
++    TEST_ASSERT_EQUAL_INT( MQTTSuccess, status );
++    TEST_ASSERT_EQUAL_UINT8( 0, fixedBuffer.pBuffer[ packetSize - 2 ] );
++    TEST_ASSERT_EQUAL_UINT8( 0, fixedBuffer.pBuffer[ packetSize - 1 ] );
++    checkBufferOverflow( buffer, sizeof( buffer ) );
++
++    /* Encode user name and password. */
++    connectInfo.pClientIdentifier = "TEST";
++    connectInfo.clientIdentifierLength = 4;
+     connectInfo.pUserName = "USER";
+     connectInfo.userNameLength = 4;
+     connectInfo.pPassword = "PASS";
