@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import tempfile
 import unittest
@@ -199,6 +201,47 @@ class RecordTest(unittest.TestCase):
             self.assertEqual(summary["missing_results"], ["FreeRTOS/coreMQTT pull/383"])
             self.assertEqual(rejects.read(env.root, "freertos"), [])
 
+    def test_an_item_that_is_already_a_case_is_not_drafted(self) -> None:
+        it = item(key="FreeRTOS/coreMQTT:fix-support-zero-length-clientid")
+        other = item(number=384)
+        with tempfile.TemporaryDirectory() as tmp:
+            env = Env(tmp, [it, other], {0: accepted_result(it), 1: accepted_result(other)})
+            write(env.root / "cases" / "coremqtt-331" / "meta.yaml", json.dumps({"dedupe_key": it["dedupe_key"]}))
+            write(env.root / "cases" / "coremqtt-384" / "case.yaml", json.dumps({"id": "coremqtt-384", "repo": "https://github.com/FreeRTOS/coreMQTT.git"}))
+            summary = env.apply()
+            rows = rejects.read(env.root, "freertos")
+            self.assertEqual((summary["written"], summary["errors"]), ([], []))
+            self.assertEqual([(r["ref"], r["reason_code"]) for r in rows],
+                             [("pull/383", "duplicate_backport"), ("pull/384", "duplicate_backport")])
+
+    def test_one_bad_draft_is_dropped_and_the_others_are_kept(self) -> None:
+        good, bad = item(number=383), item(number=384, spdx="GPL-3.0")
+        with tempfile.TemporaryDirectory() as tmp:
+            env = Env(tmp, [bad, good], {0: accepted_result(bad), 1: accepted_result(good)})
+            summary = env.apply()
+            self.assertEqual((summary["written"], summary["dropped"]), (["coremqtt-383"], ["coremqtt-384"]))
+            self.assertIn("coremqtt-384", summary["errors"][0])
+            self.assertIn("license", summary["errors"][0])
+            self.assertFalse((env.root / "candidates" / "coremqtt-384").exists())
+            self.assertEqual(list(candidates.check_candidates(env.root)), [])
+            saved = json.loads((env.root / "candidates" / "_runs" / "777" / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(saved["dropped"], ["coremqtt-384"])
+
+    def test_a_missing_result_does_not_stop_the_others(self) -> None:
+        gone, good = item(number=383), item(number=384)
+        with tempfile.TemporaryDirectory() as tmp:
+            env = Env(tmp, [gone, good], {0: None, 1: accepted_result(good)})
+            summary = env.apply()
+            self.assertEqual((summary["written"], summary["missing_results"]),
+                             (["coremqtt-384"], ["FreeRTOS/coreMQTT pull/383"]))
+            saved = json.loads((env.root / "candidates" / "_runs" / "777" / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(saved["missing_results"], ["FreeRTOS/coreMQTT pull/383"])
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = record.main(["apply", "--discovered", str(env.discovered), "--collected", str(env.collected),
+                                    "--run-url", "https://github.com/u-pump/unfix-bench/actions/runs/778",
+                                    "--root", str(env.root)])
+            self.assertEqual(code, 0)
+
     def test_discovery_rejections_are_logged_once_over_repeated_runs(self) -> None:
         row = rejects.make(source="freertos", project="FreeRTOS/coreMQTT", ref="pull/392", fix_commit=None, stage="static",
                            reason_code="no_test_in_diff", detail="no test", fix_date="2026-08-06", miner_run=RUN)
@@ -225,7 +268,9 @@ class RecordTest(unittest.TestCase):
             self.assertEqual(env.apply()["written"], ["coremqtt-383"])
             again = env.apply()
             self.assertEqual(again["written"], [])
-            self.assertEqual(len(again["errors"]), 1)
+            self.assertEqual(again["errors"], [])  # recognised as a duplicate before drafting, and logged as one
+            self.assertEqual(rejects.read(env.root, "freertos")[0]["reason_code"], "duplicate_backport")
+            self.assertEqual(len(list((env.root / "candidates").glob("coremqtt-*"))), 1)
 
     def test_ids_and_matrix(self) -> None:
         self.assertEqual(record.case_id("FreeRTOS/FreeRTOS-Plus-TCP", 1357), "freertos-plus-tcp-1357")

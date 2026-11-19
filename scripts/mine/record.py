@@ -13,6 +13,7 @@ import argparse
 import json
 import re
 import shlex
+import shutil
 import sys
 from collections import Counter
 from pathlib import Path
@@ -32,9 +33,7 @@ class RecordError(ValueError):
     pass
 
 
-def case_id(project: str, number: int) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", project.split("/")[1].lower()).strip("-")
-    return f"{slug}-{number}"
+case_id = candidates.case_id
 
 
 def ctest_regex(name: str) -> str:
@@ -129,7 +128,8 @@ def apply(root: Path, discovered: Path, collected: Path, run_url: str) -> dict[s
     """Record one run. Returns the summary also written to ``candidates/_runs/<run-id>/summary.json``."""
     data = json.loads(discovered.read_text(encoding="utf-8"))
     summary: dict[str, Any] = {"run": run_url, "source": data["source"], "written": [], "rejected_logged": 0,
-                               "missing_results": [], "errors": [], "stats": data.get("stats", {})}
+                               "missing_results": [], "dropped": [], "errors": [], "stats": data.get("stats", {})}
+    written: dict[str, dict[str, Any]] = {}
 
     def log_row(row: dict[str, Any]) -> None:
         if rejects.append(root, row, MINER_VERSION):
@@ -138,8 +138,21 @@ def apply(root: Path, discovered: Path, collected: Path, run_url: str) -> dict[s
     for row in data["rejected"]:
         log_row(row)
     current = cap.counts(root)
+    taken_keys, taken_ids = candidates.existing_changes(root)
     for index, item in enumerate(data["accepted"]):
         directory = collected / f"baseline-{index}"
+        try:
+            name = case_id(item["project"], pr_number(item["ref"]))
+            twin = taken_keys.get(item.get("dedupe_key")) or taken_ids.get(name)
+            if twin:  # discover filters these too; this is the check on the files that will be written
+                log_row(rejects.make(source=item["source"], project=item["project"], ref=item["ref"],
+                                     fix_commit=item["fix_commit"], stage="static", reason_code="duplicate_backport",
+                                     detail=f"already exists as {twin} (key {item.get('dedupe_key')}, id {name})",
+                                     fix_date=item["fix_date"], miner_run=run_url))
+                continue
+        except (RecordError, rejects.RejectionError, KeyError, ValueError) as error:
+            summary["errors"].append(f"{item.get('project')} {item.get('ref')}: {error}")
+            continue
         if not (directory / "result.json").is_file():
             summary["missing_results"].append(f"{item['project']} {item['ref']}")
             continue
@@ -160,10 +173,22 @@ def apply(root: Path, discovered: Path, collected: Path, run_url: str) -> dict[s
                                      fix_date=item["fix_date"], miner_run=run_url))
                 continue
             log = (directory / "baseline.log").read_text(encoding="utf-8", errors="replace")
-            summary["written"].append(draft(root, item, result, log, run_url))
+            name = draft(root, item, result, log, run_url)
+            summary["written"].append(name)
+            written[name] = item
+            taken_keys[item["dedupe_key"]] = taken_ids[name] = f"candidates/{name}"
             current[cap.family(repo_url)] += 1
         except (RecordError, rejects.RejectionError, KeyError, ValueError) as error:
             summary["errors"].append(f"{item['project']} {item['ref']}: {error}")
+    # A draft that does not pass the candidates check is dropped with its reason; the others are kept.
+    problems = candidates.check_candidates(root)
+    for name, item in written.items():
+        own = [problem for problem in problems if problem.startswith((f"candidates/{name}:", f"candidates/{name}/"))]
+        if own:
+            shutil.rmtree(root / "candidates" / name)
+            summary["written"].remove(name)
+            summary["dropped"].append(name)
+            summary["errors"].append(f"{item['project']} {item['ref']}: draft {name} dropped, candidates check: {'; '.join(own)}")
     run_id = run_url.rsplit("/", 1)[-1]
     target = root / "candidates" / "_runs" / run_id
     target.mkdir(parents=True, exist_ok=True)
@@ -193,7 +218,12 @@ def main(argv: list[str] | None = None) -> int:
     if not candidates.RUN_URL.fullmatch(args.run_url):
         parser.error("--run-url must be a GitHub Actions run URL")
     summary = apply(args.root, args.discovered, args.collected, args.run_url)
-    print(json.dumps({key: summary[key] for key in ("written", "rejected_logged", "missing_results", "errors")}, sort_keys=True))
+    print(json.dumps({key: summary[key] for key in ("written", "rejected_logged", "missing_results", "dropped", "errors")},
+                     sort_keys=True))
+    for line in summary["missing_results"]:
+        print(f"record: no baseline result for {line}", file=sys.stderr)
+    for line in summary["errors"]:
+        print(f"record: {line}", file=sys.stderr)
     problems = candidates.check_candidates(args.root)
     for problem in problems:
         print(f"candidates check: {problem}", file=sys.stderr)

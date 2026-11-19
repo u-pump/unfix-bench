@@ -200,10 +200,13 @@ def fetch_item(client: Client, source: str, repo: str, number: int, repo_info: d
     return item
 
 
-def dedupe(items: list[dict[str, Any]], known_keys: set[str], miner_run: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """One item per change: the earliest fix wins. Later ones, and keys already in ``candidates/``, are rejected."""
+def dedupe(items: list[dict[str, Any]], known_keys: dict[str, str] | set[str], miner_run: str,
+           known_ids: dict[str, str] | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """One item per change: the earliest fix wins. Later ones, and keys or case ids already in
+    ``candidates/`` or ``cases/``, are rejected."""
     kept: dict[str, dict[str, Any]] = {}
     rows: list[dict[str, Any]] = []
+    known_ids = known_ids or {}
 
     def reject(item: dict[str, Any], detail: str) -> None:
         rows.append(rejects.make(source=item["source"], project=item["project"], ref=item["ref"],
@@ -212,21 +215,17 @@ def dedupe(items: list[dict[str, Any]], known_keys: set[str], miner_run: str) ->
 
     for item in sorted(items, key=lambda it: (it["fix_date"], it["project"], int(it["ref"].split("/")[1]))):
         key = item["dedupe_key"] = filters.dedupe_key(item["project"], item["title"])
+        name = candidates.case_id(item["project"], int(item["ref"].split("/")[1]))
         if key in known_keys:
-            reject(item, f"same change as an existing candidate ({key})")
+            where = known_keys[key] if isinstance(known_keys, dict) else "an existing candidate"
+            reject(item, f"same change as {where} ({key})")
+        elif name in known_ids:
+            reject(item, f"already exists as {known_ids[name]} (id {name})")
         elif key in kept:
             reject(item, f"same change as {kept[key]['project']} {kept[key]['ref']} (key {key})")
         else:
             kept[key] = item
     return list(kept.values()), rows
-
-
-def known_dedupe_keys(root: Path) -> set[str]:
-    keys = set()
-    for path in sorted(root.glob("candidates/*/meta.yaml")):
-        if not path.parent.name.startswith("_"):
-            keys.add(json.loads(path.read_text(encoding="utf-8"))["dedupe_key"])
-    return keys
 
 
 def discover(client: Client, *, source: str, miner_run: str, root: Path, repos: list[str] | None = None,
@@ -266,7 +265,8 @@ def discover(client: Client, *, source: str, miner_run: str, root: Path, repos: 
             rows.append(row)
         else:
             passed.append(item)
-    accepted, duplicates = dedupe(passed, known_dedupe_keys(root), miner_run)
+    known_keys, known_ids = candidates.existing_changes(root)
+    accepted, duplicates = dedupe(passed, known_keys, miner_run, known_ids)
     rows.extend(duplicates)
     deferred = 0
     if max_accepted is not None and len(accepted) > max_accepted:

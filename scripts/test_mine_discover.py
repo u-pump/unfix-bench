@@ -156,6 +156,21 @@ class DiscoverTest(unittest.TestCase):
         self.assertEqual(result["accepted"], [])
         self.assertEqual(result["rejected"][0]["reason_code"], "duplicate_backport")
 
+    def test_a_change_already_in_cases_is_skipped_before_baseline(self) -> None:
+        for filename, content in (("meta.yaml", {"dedupe_key": "FreeRTOS/coreMQTT:fix-subscribe-wildcard-check-bounds"}),
+                                  ("case.yaml", {"id": "coremqtt-383"})):
+            with self.subTest(filename), tempfile.TemporaryDirectory() as tmp:
+                folder = Path(tmp) / "cases" / "coremqtt-383"
+                folder.mkdir(parents=True)
+                (folder / filename).write_text(json.dumps(content), encoding="utf-8")
+                (Path(tmp) / "cases" / "old-1").mkdir()  # a case with neither file does not break the scan
+                result = discover.discover(FakeClient(routes()), source="freertos", miner_run=RUN, root=Path(tmp),
+                                           refs=[(MQTT, 383)])
+                self.assertEqual(result["accepted"], [])
+                row = result["rejected"][0]
+                self.assertEqual((row["reason_code"], row["stage"]), ("duplicate_backport", "static"))
+                self.assertIn("cases/coremqtt-383", row["detail"])
+
     def test_rejections_fit_the_log_and_repeat_runs_do_not_grow_it(self) -> None:
         result = self.run_discover(FakeClient(routes()), refs=[(MQTT, 392)])
         with tempfile.TemporaryDirectory() as tmp:
