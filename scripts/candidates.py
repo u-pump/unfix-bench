@@ -36,7 +36,7 @@ REJECT_CODES = (
     "no_test_in_diff", "test_only_fix", "duplicate_backport", "base_not_failing_3of3",
     "fix_not_passing_3of3", "build_failed", "over_30_min", "needs_hardware",
     "needs_network_dependency", "noisy_module", "test_not_selectable", "unsupported_by_verifier",
-    "license_unclear", "no_issue_text", "project_cap", "not_a_behavior_bug",
+    "license_unclear", "no_issue_text", "project_cap", "not_a_behavior_bug", "submodule_changed_by_fix",
 )
 
 SHA = re.compile(r"[0-9a-f]{40}")
@@ -213,13 +213,54 @@ def _load(path: Path, where: str, problems: Problems) -> Any:
     return None
 
 
+def case_id(project: str, number: int) -> str:
+    """The id a mined pull request gets as a candidate and as a case: ``<repo slug>-<number>``."""
+    slug = re.sub(r"[^a-z0-9]+", "-", project.split("/")[1].lower()).strip("-")
+    return f"{slug}-{number}"
+
+
+def _tolerant_json(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def existing_changes(root: Path = ROOT, *, candidates_too: bool = True) -> tuple[dict[str, str], dict[str, str]]:
+    """``(dedupe keys, ids)`` already taken, each mapped to where it is (``cases/x`` or ``candidates/x``).
+
+    Reads the directory names and ``case.yaml`` / ``meta.yaml`` of every entry of ``cases/`` and, unless
+    ``candidates_too`` is false, of ``candidates/`` (entries starting with ``_`` are not candidates). Unreadable
+    files are skipped here; ``check`` reports them.
+    """
+    keys: dict[str, str] = {}
+    ids: dict[str, str] = {}
+    folders = ["cases", "candidates"] if candidates_too else ["cases"]
+    for folder in folders:
+        parent = root / folder
+        if not parent.is_dir():
+            continue
+        for directory in sorted(p for p in parent.iterdir() if p.is_dir() and not p.name.startswith("_")):
+            where = f"{folder}/{directory.name}"
+            ids.setdefault(directory.name, where)
+            for filename in ("case.yaml", "meta.yaml"):
+                data = _tolerant_json(directory / filename)
+                if not isinstance(data, dict):
+                    continue
+                if _text(data.get("id")):
+                    ids.setdefault(data["id"], where)
+                if _text(data.get("dedupe_key")):
+                    keys.setdefault(data["dedupe_key"], where)
+    return keys, ids
+
+
 def check_candidates(root: Path = ROOT) -> Problems:
     problems = Problems()
     base = root / "candidates"
     if not base.is_dir():
         return problems
     published = {p.name for p in (root / "cases").iterdir() if p.is_dir()} if (root / "cases").is_dir() else set()
-    keys: dict[str, str] = {}
+    keys: dict[str, str] = existing_changes(root, candidates_too=False)[0]
     for directory in sorted(p for p in base.iterdir() if p.is_dir() and not p.name.startswith("_")):
         name = directory.name
         if not CASE_ID.fullmatch(name):
@@ -237,7 +278,7 @@ def check_candidates(root: Path = ROOT) -> Problems:
             if isinstance(key, str) and key.strip():
                 if key in keys:
                     problems.add(f"candidates/{name}/meta.yaml", f"dedupe_key duplicates {keys[key]} (a backport counts once)")
-                keys[key] = name
+                keys[key] = f"candidates/{name}"
         for required in ("ISSUE.md", "baseline.log"):
             path = directory / required
             if not path.is_file() or not path.read_text(encoding="utf-8", errors="replace").strip():

@@ -53,6 +53,14 @@ class BaselineError(RuntimeError):
     """Infrastructure failure (clone, missing commit): the job fails, nothing is recorded as a rejection."""
 
 
+class Refusal(Exception):
+    """The candidate cannot be baselined, which is a verdict and not a failure: it becomes a rejection row."""
+
+    def __init__(self, stage: str, code: str, detail: str) -> None:
+        super().__init__(detail)
+        self.stage, self.code, self.detail = stage, code, detail
+
+
 @dataclass
 class Result:
     returncode: int
@@ -185,8 +193,9 @@ def evaluate(base: list[dict[str, Any]], fix: list[dict[str, Any]], changed: lis
 # ---------------------------------------------------------------- git (network allowed, builds are not run here)
 
 def git(directory: Path, *args: str, check: bool = True) -> str:
+    # errors="replace": a source file in the project may not be UTF-8, which must not crash the job
     done = subprocess.run(["git", "-C", str(directory), *args], capture_output=True, text=True, check=False,
-                          env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+                          encoding="utf-8", errors="replace", env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
     if check and done.returncode != 0:
         raise BaselineError(f"git {' '.join(args[:2])} failed: {done.stderr.strip()[:300]}")
     return done.stdout
@@ -232,8 +241,11 @@ def prepare(item: dict[str, Any], work: Path, clone_url: str | None = None,
     fix = git(repo, "rev-parse", "--verify", item["fix_commit"] + "^{commit}").strip()
     base = git(repo, "rev-parse", "--verify", fix + "^1").strip()
     pins = gitlinks(repo, base)
-    if pins != gitlinks(repo, fix):
-        raise BaselineError("submodule commits differ between base and fix")
+    after = gitlinks(repo, fix)
+    if pins != after:
+        changed = sorted(path for path in pins.keys() | after.keys() if pins.get(path) != after.get(path))
+        raise Refusal("baseline", "submodule_changed_by_fix",
+                      f"submodule commits differ between base and fix: {', '.join(changed)[:200]}")
     split = filters.split_files(item["files"])
     overlay = [path for path in item["files"] if path not in split["source"]]
     present = set(git(repo, "ls-tree", "-r", "--name-only", fix).splitlines())
@@ -336,7 +348,11 @@ def run_side(runner: Runner, directory: Path, which: str, build: str, test: str,
         if text is None:
             return None, {"accepted": False, "stage": "baseline", "reason_code": "over_30_min" if done.timed_out else "build_failed",
                           "detail": f"{which} run {number}: " + ("timed out" if done.timed_out else "ctest wrote no JUnit file")}
-        modules, functions = parse_junit(text)
+        try:
+            modules, functions = parse_junit(text)
+        except (ValueError, ET.ParseError) as error:
+            return None, {"accepted": False, "stage": "baseline", "reason_code": "build_failed",
+                          "detail": f"{which} run {number}: refused the JUnit file: {str(error)[:200]}"}
         failed = sorted(name for name, ok in modules.items() if not ok)
         log.append(f"=== {which} run {number}: {len(modules)} ctest tests, failed: {', '.join(failed) or 'none'}")
         for module in failed:
@@ -346,6 +362,17 @@ def run_side(runner: Runner, directory: Path, which: str, build: str, test: str,
     return runs, None
 
 
+def refused(item: dict[str, Any], miner_run: str, stage: str, code: str, detail: str, elapsed: float = 0.0) -> dict[str, Any]:
+    """The result of a candidate that was refused before or without a build: a rejection, never a failed job."""
+    row = {"accepted": False, "stage": stage, "reason_code": code, "detail": detail}
+    return {"ref": item["ref"], "project": item["project"], "elapsed_s": elapsed, "verdict": row, "changed_functions": [],
+            "submodules": [], "build_network": "none", "build": "", "test": "", "base": None, "fix": None,
+            "rejection": rejects.make(source=item["source"], project=item["project"], ref=item["ref"],
+                                      fix_commit=item["fix_commit"], stage=stage, reason_code=code,
+                                      detail=detail, fix_date=item["fix_date"], miner_run=miner_run),
+            "log": f"=== refused: {code}: {detail}" + chr(10)}
+
+
 def run_baseline(item: dict[str, Any], work: Path, runner: Runner, *, miner_run: str, cmake_dir: str | None = None,
                  options: tuple[str, ...] | None = None, clone_url: str | None = None, time_limit: int = TIME_LIMIT_S,
                  protocols: tuple[str, ...] = ("https",)) -> dict[str, Any]:
@@ -353,15 +380,12 @@ def run_baseline(item: dict[str, Any], work: Path, runner: Runner, *, miner_run:
     started = time.monotonic()
     recipe = recipes.recipe_for(item["project"])
     if cmake_dir is None and options is None and recipe is None:
-        row = {"accepted": False, "stage": "build", "reason_code": "build_failed",
-               "detail": f"no build recipe for {item['project']} (scripts/mine/recipes.py)"}
-        return {"ref": item["ref"], "project": item["project"], "elapsed_s": 0.0, "verdict": row, "changed_functions": [],
-                "submodules": [], "build_network": "none", "build": "", "test": "", "base": None, "fix": None,
-                "rejection": rejects.make(source=item["source"], project=item["project"], ref=item["ref"],
-                                          fix_commit=item["fix_commit"], stage="build", reason_code="build_failed",
-                                          detail=row["detail"], fix_date=item["fix_date"], miner_run=miner_run),
-                "log": f"=== no build recipe for {item['project']}" + chr(10)}
-    prepared = prepare(item, work, clone_url, protocols)
+        return refused(item, miner_run, "build", "build_failed",
+                       f"no build recipe for {item['project']} (scripts/mine/recipes.py)")
+    try:
+        prepared = prepare(item, work, clone_url, protocols)
+    except Refusal as refusal:
+        return refused(item, miner_run, refusal.stage, refusal.code, refusal.detail, round(time.monotonic() - started, 1))
     if cmake_dir is None and options is None and recipe is not None:
         build, test = commands(recipe.cmake_dir, recipe.options, recipe.generator, recipe.ctest_exclude)
     else:

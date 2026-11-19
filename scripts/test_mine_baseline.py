@@ -6,6 +6,9 @@ The JUnit and Unity samples are written by hand from the documented formats, not
 
 from __future__ import annotations
 
+import contextlib
+import io
+import json
 import subprocess
 import tempfile
 import unittest
@@ -342,6 +345,76 @@ class PipelineTest(unittest.TestCase):
                     "fix_date": "2026-08-06", "files": []}
             with self.assertRaises(baseline.BaselineError):
                 baseline.prepare(item, Path(tmp) / "w", str(repo))
+
+    def test_submodule_changed_by_the_fix_is_a_rejection_not_a_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, _ = make_repo(Path(tmp))
+            sh(repo, "update-index", "--add", "--cacheinfo", f"160000,{'1' * 40},deps/dep")
+            sh(repo, "commit", "-q", "-m", "pin")
+            sh(repo, "update-index", "--add", "--cacheinfo", f"160000,{'2' * 40},deps/dep")
+            sh(repo, "commit", "-q", "-m", "fix moves the pin")
+            fix = sh(repo, "rev-parse", "HEAD")
+            item = {"source": "freertos", "project": "FreeRTOS/coreMQTT", "ref": "pull/1", "fix_commit": fix,
+                    "fix_date": "2026-08-06", "files": ["src/lib.c"]}
+            runner = FakeRunner()
+            result = baseline.run_baseline(item, Path(tmp) / "work", runner, miner_run=RUN, clone_url=str(repo))
+            self.assertEqual(runner.calls, [])  # nothing was built
+            self.assertFalse(result["verdict"]["accepted"])
+            row = result["rejection"]
+            self.assertEqual((row["stage"], row["reason_code"]), ("baseline", "submodule_changed_by_fix"))
+            self.assertIn("deps/dep", row["detail"])
+            problems = candidates.Problems()
+            candidates.validate_rejection(row, "row", problems)
+            self.assertEqual(list(problems), [])
+            # the job: exit status 0, result.json and baseline.log are written for the artifact
+            discovered = Path(tmp) / "discovered.json"
+            discovered.write_text(json.dumps({"accepted": [item]}), encoding="utf-8")
+            out = Path(tmp) / "out"
+            real = baseline.prepare
+
+            def from_local(it: dict[str, Any], work: Path, clone_url: str | None = None, protocols: tuple[str, ...] = ("https",)):
+                return real(it, work, str(repo), protocols)
+
+            baseline.prepare = from_local
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    code = baseline.main(["--discovered", str(discovered), "--index", "0", "--image", "x", "--run-url", RUN,
+                                          "--work", str(Path(tmp) / "w2"), "--out", str(out)])
+            finally:
+                baseline.prepare = real
+            self.assertEqual(code, 0)
+            written = json.loads((out / "result.json").read_text(encoding="utf-8"))
+            self.assertEqual(written["verdict"]["reason_code"], "submodule_changed_by_fix")
+            self.assertTrue((out / "baseline.log").is_file())
+
+    def test_a_junit_file_that_does_not_parse_is_a_rejection(self) -> None:
+        for broken in ("<testsuite><testcase", '<!DOCTYPE x [<!ENTITY a "b">]><testsuite/>'):
+            class Broken(FakeRunner):
+                def run(self, workdir: Path, command: str, timeout: int) -> baseline.Result:
+                    if command.startswith("cmake"):
+                        return baseline.Result(0, "")
+                    (workdir / "build").mkdir(exist_ok=True)
+                    (workdir / "build" / "junit.xml").write_text(broken, encoding="utf-8")
+                    return baseline.Result(1, "")
+
+            with self.subTest(broken[:12]), tempfile.TemporaryDirectory() as tmp:
+                repo, fix = make_repo(Path(tmp))
+                item = {"source": "freertos", "project": "FreeRTOS/coreMQTT", "ref": "pull/1", "fix_commit": fix,
+                        "fix_date": "2026-08-06", "files": ["src/lib.c", "test/unit-test/lib_utest.c"]}
+                result = baseline.run_baseline(item, Path(tmp) / "w", Broken(), miner_run=RUN, clone_url=str(repo))
+                self.assertEqual((result["rejection"]["stage"], result["rejection"]["reason_code"]), ("baseline", "build_failed"))
+                self.assertIn("JUnit", result["rejection"]["detail"])
+
+    def test_a_test_file_that_is_not_utf8_does_not_crash_preparation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, _ = make_repo(Path(tmp))
+            (repo / "test" / "unit-test" / "lib_utest.c").write_bytes(TEST_V2.encode().replace(b"1, 2 );", b"1, 3 ); /* caf\xe9 */"))
+            sh(repo, "commit", "-q", "-am", "latin-1 comment")
+            item = {"source": "freertos", "project": "FreeRTOS/coreMQTT", "ref": "pull/1",
+                    "fix_commit": sh(repo, "rev-parse", "HEAD"), "fix_date": "2026-08-06",
+                    "files": ["src/lib.c", "test/unit-test/lib_utest.c"]}
+            prepared = baseline.prepare(item, Path(tmp) / "w", str(repo))
+            self.assertIn("test_new", prepared["changed_functions"])
 
     def test_submodule_pins_come_from_the_tree(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
