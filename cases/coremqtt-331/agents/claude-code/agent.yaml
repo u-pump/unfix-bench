@@ -19,8 +19,14 @@
       "note": "limitation of the verifier, not a verdict on the patch"
     },
     {
-      "verdict": "see results/coremqtt-331/claude-code.md",
+      "verdict": "VERIFIED",
       "verifier": "cplus dadf0588efee26730378c298fdddd212437aed86",
+      "checked_utc": "2026-11-18 12:05:49",
+      "note": "same patch (sha256 669b364d...), agent not rerun; 8 of 8 gates PASS"
+    },
+    {
+      "verdict": "see results/coremqtt-331/claude-code.md",
+      "verifier": "cplus a69c6524b9680dd349c511de32a628f40e7dc2a2",
       "note": "same patch (sha256 669b364d...), agent not rerun; verified by the regular path"
     }
   ],

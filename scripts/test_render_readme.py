@@ -34,6 +34,17 @@ def write(results: Path, case: str, agent: str, verdict: str) -> None:
 
 
 class RenderReadmeTest(unittest.TestCase):
+    def test_a_footnote_mark_after_a_verdict_cell_is_kept(self) -> None:
+        marked = README.replace("[PENDING](results/b-2/claude-code.md) |", "[PENDING](results/b-2/claude-code.md)[^1] |")
+        with tempfile.TemporaryDirectory() as directory:
+            results = Path(directory)
+            for case in ("a-1", "b-2", "c-3"):
+                write(results, case, "codex-cli", "REJECTED")
+                write(results, case, "claude-code", "VERIFIED")
+            out = render_readme.render(marked, results)
+        self.assertIn("[VERIFIED](results/b-2/claude-code.md)[^1] |", out)
+        self.assertNotIn("[^1]", out.replace("[VERIFIED](results/b-2/claude-code.md)[^1]", ""))
+
     def test_cells_and_totals_come_from_results(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             results = Path(directory)
