@@ -14,11 +14,12 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 import candidates
 from mine import filters, rejects
@@ -45,10 +46,42 @@ class Client(Protocol):
 
 
 class HttpClient:
-    """GitHub REST over urllib. The token (read-only is enough) comes from the environment only."""
+    """GitHub REST over urllib. The token (read-only is enough) comes from the environment only.
 
-    def __init__(self, token: str | None = None) -> None:
+    A rate-limited answer (primary limit with ``x-ratelimit-remaining: 0``, or a ``retry-after`` of the secondary
+    limit) is waited out and the request is repeated, so a long discovery does not stop on the hourly limit. The
+    wait comes from the response headers; if all waits of one client would pass ``max_wait`` seconds, it gives up.
+    """
+
+    MAX_RETRIES = 4
+    SECONDARY_WAIT = 60  # seconds, when a secondary limit names no retry-after
+
+    def __init__(self, token: str | None = None, *, max_wait: float = 3600.0,
+                 sleep: Callable[[float], None] = time.sleep, now: Callable[[], float] = time.time,
+                 opener: Callable[..., Any] = urllib.request.urlopen) -> None:
         self.token = token
+        self.max_wait = max_wait
+        self.waited = 0.0
+        self._sleep, self._now, self._open = sleep, now, opener
+
+    def _wait_for(self, error: urllib.error.HTTPError) -> float | None:
+        """Seconds to wait when ``error`` is a rate limit, else ``None``."""
+        if error.code not in (403, 429):
+            return None
+        headers = error.headers or {}
+        retry_after, remaining, reset = headers.get("retry-after"), headers.get("x-ratelimit-remaining"), headers.get("x-ratelimit-reset")
+        try:
+            if retry_after is not None:
+                return max(float(retry_after), 1.0) + 1.0
+            if remaining == "0" and reset is not None:
+                return max(float(reset) - self._now(), 0.0) + 1.0
+        except ValueError:
+            return None
+        try:
+            body = error.read().decode("utf-8", "replace").lower()
+        except (OSError, ValueError):
+            body = ""
+        return float(self.SECONDARY_WAIT) if "rate limit" in body else None
 
     def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         url = API + path + ("?" + urllib.parse.urlencode(params) if params else "")
@@ -56,20 +89,56 @@ class HttpClient:
                    "User-Agent": "bench-miner"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
-        try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as response:
-                return json.load(response)
-        except urllib.error.HTTPError as error:
-            hint = " (rate limit: set GITHUB_TOKEN)" if error.code in (403, 429) else ""
-            raise GitHubError(f"GET {path} -> HTTP {error.code}{hint}") from None
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
-            raise GitHubError(f"GET {path} failed: {error}") from None
+        for attempt in range(self.MAX_RETRIES + 1):
+            try:
+                with self._open(urllib.request.Request(url, headers=headers), timeout=60) as response:
+                    return json.load(response)
+            except urllib.error.HTTPError as error:
+                wait = self._wait_for(error)
+                if wait is None:
+                    hint = " (rate limit: set GITHUB_TOKEN)" if error.code in (403, 429) else ""
+                    raise GitHubError(f"GET {path} -> HTTP {error.code}{hint}") from None
+                if attempt == self.MAX_RETRIES or self.waited + wait > self.max_wait:
+                    raise GitHubError(f"GET {path} -> HTTP {error.code}: rate limit, would wait {wait:.0f} s "
+                                      f"(already waited {self.waited:.0f} of {self.max_wait:.0f} s)") from None
+                print(f"discover: rate limit on GET {path}; waiting {wait:.0f} s", file=sys.stderr, flush=True)
+                self._sleep(wait)
+                self.waited += wait
+            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
+                raise GitHubError(f"GET {path} failed: {error}") from None
+        raise GitHubError(f"GET {path} failed")  # not reached
 
 
 def check_repo(repo: str) -> str:
     if not REPO_NAME.fullmatch(repo):
         raise ValueError(f"not an owner/repo name: {repo!r}")
     return repo
+
+
+QUERY_WORD = re.compile(r"-?[A-Za-z0-9][\w.-]*")
+QUERY_QUALIFIER = re.compile(r"in:(?:title|body)|label:[\w.-]+")
+QUERY_OPERATORS = frozenset({"OR", "AND", "NOT"})
+MAX_QUERY = 200
+
+
+def check_query(query: str) -> str:
+    """Search words for the title filter. Only plain words, ``OR``/``AND``/``NOT``, ``in:title|body`` and
+    ``label:x`` are allowed: a ``repo:``, ``org:`` or ``is:`` qualifier would move the search to other pull requests."""
+    if len(query) > MAX_QUERY:
+        raise ValueError(f"the query is longer than {MAX_QUERY} characters")
+    for token in query.split():
+        if not (token in QUERY_OPERATORS or QUERY_QUALIFIER.fullmatch(token) or QUERY_WORD.fullmatch(token)):
+            raise ValueError(f"not allowed in a query: {token!r}")
+    return query
+
+
+def check_repos(source: str, repos: list[str]) -> list[str]:
+    """Repositories named by the owner must belong to the source."""
+    allowed = SOURCE_REPOS.get(source, ())
+    for repo in repos:
+        if check_repo(repo) not in allowed:
+            raise ValueError(f"{repo} is not a repository of source {source!r} ({', '.join(allowed)})")
+    return repos
 
 
 def paged(client: Client, path: str, params: dict[str, Any], limit: int, key: str | None = None) -> list[Any]:
@@ -216,7 +285,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prs", default="", help="explicit owner/repo#N list instead of a search")
     parser.add_argument("--since", default="2025-01-01", help="merged on or after YYYY-MM-DD")
     parser.add_argument("--max-prs", type=int, default=50, help="pull requests looked at per repository")
-    parser.add_argument("--query", default="fix in:title")
+    parser.add_argument("--query", default="fix in:title", help="title words; empty means every merged pull request")
     parser.add_argument("--max-candidates", type=int, default=None, help="keep at most this many accepted items")
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args(argv)
@@ -224,10 +293,14 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--run-url must be a GitHub Actions run URL")
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.since):
         parser.error("--since must be YYYY-MM-DD")
-    if not re.fullmatch(r"[\w :.<>=-]*", args.query):
-        parser.error("--query may contain only letters, digits and : . < > = - and spaces")
+    if not 1 <= args.max_prs <= 1000:
+        parser.error("--max-prs must be from 1 to 1000 (GitHub search returns at most 1000 results)")
     try:
-        repos = [check_repo(name.strip()) for name in args.repos.split(",") if name.strip()] or None
+        check_query(args.query)
+    except ValueError as error:
+        parser.error(str(error))
+    try:
+        repos = check_repos(args.source, [name.strip() for name in args.repos.split(",") if name.strip()]) or None
         refs = parse_refs(args.prs) if args.prs.strip() else None
         result = discover(HttpClient(os.environ.get("GITHUB_TOKEN") or None), source=args.source,
                           miner_run=args.run_url, root=candidates.ROOT, repos=repos, refs=refs,
@@ -235,6 +308,8 @@ def main(argv: list[str] | None = None) -> int:
     except (GitHubError, ValueError) as error:
         print(f"discover: {error}", file=sys.stderr)
         return 1
+    print(f"discover: repos={','.join(repos or SOURCE_REPOS[args.source])} query={args.query!r} since={args.since} "
+          f"max_prs={args.max_prs}", file=sys.stderr)
     args.out.write_text(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps(result["stats"], sort_keys=True))
     return 0
