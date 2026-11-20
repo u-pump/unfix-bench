@@ -107,6 +107,18 @@ class EvaluateTest(unittest.TestCase):
         got = self.verdict(base, fix, ["test_new"])
         self.assertEqual((got["reason_code"], got["stage"]), ("fix_not_passing_3of3", "fix_run"))
 
+    def test_fix_runs_must_be_green_in_every_module(self) -> None:
+        base = [run(False, test_new=False)] * 3
+        # the chosen module is green on the fix, another module is red in one run: not clean, not accepted
+        red_elsewhere = {"modules": {"mod": True, "other": False}, "functions": {"mod": {"test_new": True}}}
+        fix = [run(True, test_new=True), red_elsewhere, run(True, test_new=True)]
+        got = self.verdict(base, fix, ["test_new"])
+        self.assertEqual((got["accepted"], got["reason_code"], got["stage"]), (False, "fix_runs_not_clean", "fix_run"))
+        self.assertIn("other", got["detail"])
+        self.assertIn("1 of 3", got["detail"])
+        # the same shapes with all fix runs green are accepted
+        self.assertTrue(self.verdict(base, [run(True, test_new=True)] * 3, ["test_new"])["accepted"])
+
     def test_not_selectable_without_unity_results_or_without_a_failing_changed_function(self) -> None:
         bare = [{"modules": {"mod": False}, "functions": {}}] * 3
         self.assertEqual(self.verdict(bare, [run(True)] * 3, ["test_new"])["reason_code"], "test_not_selectable")

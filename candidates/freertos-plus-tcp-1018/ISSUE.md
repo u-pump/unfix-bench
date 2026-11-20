@@ -1,9 +1,8 @@
-<!-- DRAFT. This is the text of the upstream pull request, which describes the fix. The owner removes every solution hint before this becomes an issue; nothing was removed automatically. -->
+# FreeRTOS_send() with a NULL buffer always fails (TCP zero copy)
 
-# Fixes the TCP zero-copy functionality...
+For a TCP socket, FreeRTOS_send() called with pvBuffer == NULL is the zero-copy mode: the caller has already placed the data in the socket's transmit stream buffer and only asks the stack to send it. This used to work, but now the call always fails with -pdFREERTOS_ERRNO_EINVAL, even for an established connection with enough space in the stream buffer.
 
-Source: https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/pull/1018
-
-As discussed in #1008 
-It appears that this worked at some point but then got broken.
-To reproduce: call FreeRTOS_send() with pvBuffer being NULL and the call always fails.
+Expected:
+- FreeRTOS_send( socket, NULL, uxDataLength, flags ) on an established TCP socket with room in the transmit stream buffer returns the number of bytes accepted (uxDataLength).
+- When the stream buffer has less space than uxDataLength, it returns the number of bytes that fit.
+- The checks of the socket (valid TCP socket, not closed or closing, uxDataLength non-zero) are still made.

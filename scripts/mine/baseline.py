@@ -166,6 +166,12 @@ def evaluate(base: list[dict[str, Any]], fix: list[dict[str, Any]], changed: lis
     modules = [name for name in sorted(failing_always) if name not in fix_failing]
     if not modules:
         return reject("fix_run", "fix_not_passing_3of3", f"fails on the fix in some run: {', '.join(sorted(fix_failing & failing_always))}")
+    if fix_failing:
+        # Every ctest test must pass in all 3 fix runs, not only the chosen module: a red test elsewhere on the fix
+        # is a flaky or broken environment, and the owner could not tell it from a regression.
+        return reject("fix_run", "fix_runs_not_clean",
+                      f"fix runs are not all green: {', '.join(sorted(fix_failing))} failed in "
+                      f"{sum(1 for run in fix if _failing(run))} of {len(fix)} runs")
     problem: dict[str, Any] | None = None
     for module in modules:
         base_sets = _failing_functions(base, module)
