@@ -61,6 +61,58 @@ def quiet_stage(stage: str, reason: str, *args: str,
         raise CaseExecutionError(stage, reason) from exc
 
 
+# What a failing ``cplus bug`` / ``cplus verify`` may say in public: the message classes cplus itself raises
+# (bug_check/engine.py). Anything else stays in the private log.
+CPLUS_DIAGNOSTIC = re.compile(
+    r"(?:build problem: |timed out after \d+(?:\.\d+)? s while building|sandbox failed|"
+    r"[\w ]*environment problem|the fix's test cannot be (?:built|applied))"
+)
+CPLUS_PREFIX = re.compile(r"^(?:Could not reproduce bug|Error|error):\s*")
+ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+
+def cplus_diagnostic(stderr: object) -> str | None:
+    """One public line from a failed cplus run, or None: whitelisted classes only, no paths, at most 240 characters."""
+    if not isinstance(stderr, str):
+        return None
+    for raw in stderr.splitlines():
+        line = CPLUS_PREFIX.sub("", " ".join(ANSI.sub("", raw).split()))
+        if not CPLUS_DIAGNOSTIC.match(line):
+            continue
+        line = re.sub(r"(?<!\w)(?:[A-Za-z]:[\\/]|\.{0,2}/(?!/))\S+", "[path]", line)
+        if re.search(r"\b(?:traceback|stdout|stderr)\b|::", line, re.I):
+            continue
+        return line[:240]
+    return None
+
+
+def log_cplus(case_id: str, agent_id: str, stage: str, run: subprocess.CompletedProcess[str]) -> None:
+    """Keep the complete output of one cplus call in $RUNNER_TEMP (private, never uploaded); print the public facts.
+
+    Only the return code and the whitelisted line reach the public log. With VERIFY_DEBUG_LOG=true (the workflow sets
+    it for a manual run by the owner) the last 200 lines are printed in a group, indented so that a line of the
+    build output cannot be read as a workflow command.
+    """
+    text = f"$ {stage} (exit {run.returncode})\n--- stdout\n{run.stdout or ''}\n--- stderr\n{run.stderr or ''}\n"
+    path = TEMP / f"cplus-{case_id}-{agent_id}.log"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8", errors="replace") as handle:
+            handle.write(text)
+    except OSError:
+        pass
+    if run.returncode:
+        line = cplus_diagnostic(run.stderr)
+        print(f"{case_id}/{agent_id}: {stage} returncode={run.returncode}" + (f"; {line}" if line else ""),
+              flush=True)
+    if os.environ.get("VERIFY_DEBUG_LOG") == "true":
+        tail = text.splitlines()[-200:]
+        print(f"::group::{case_id}/{agent_id} {stage} (last {len(tail)} lines)")
+        for row in tail:
+            print("  " + ANSI.sub("", row))
+        print("::endgroup::", flush=True)
+
+
 def case_revision(case_id: str) -> str:
     """The cplus revision this case is verified with: ``verifier_revision`` of its case.yaml, else the legacy one."""
     case = json.loads((ROOT / "cases" / case_id / "case.yaml").read_text(encoding="utf-8"))
@@ -522,11 +574,13 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
     if reference_name is not None:
         bug_args.extend(("--command", f"GTEST_FILTER={reference_name} {case['test']}"))
     bug = quiet_stage("cplus bug baseline", "reference test did not reproduce", *bug_args)
+    log_cplus(case_id, agent_id, "cplus bug", bug)
     verdict_words = sorted(set(re.findall(r"(REPRODUCED|NOT_VERIFIABLE|ERROR)", bug.stdout or "")))
     print(f"{case_id}/{agent_id}: cplus bug exit={bug.returncode} words={verdict_words} "
           f"{baseline_summary(spec) if spec.is_file() else 'no bug spec written'}", flush=True)
     if bug.returncode or "REPRODUCED" not in bug.stdout or not spec.is_file():
-        raise CaseExecutionError("cplus bug baseline", "reference test did not reproduce")
+        raise CaseExecutionError("cplus bug baseline", (bug.returncode and cplus_diagnostic(bug.stderr))
+                                 or "reference test did not reproduce")
     if unity:
         try:
             recorded = json.loads(spec.read_text(encoding="utf-8"))
@@ -544,6 +598,7 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
         verify_args.extend(("--reference-test-name", reference_name))
     verify = quiet_stage("verify", "verifier could not evaluate patch", *verify_args)
     elapsed = time.monotonic() - started
+    log_cplus(case_id, agent_id, "cplus verify", verify)
     try:
         report = extract_json(verify.stdout)
     except ValueError as exc:
