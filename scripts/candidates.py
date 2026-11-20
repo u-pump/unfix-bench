@@ -37,6 +37,7 @@ REJECT_CODES = (
     "fix_not_passing_3of3", "build_failed", "over_30_min", "needs_hardware",
     "needs_network_dependency", "noisy_module", "test_not_selectable", "unsupported_by_verifier",
     "license_unclear", "no_issue_text", "project_cap", "not_a_behavior_bug", "submodule_changed_by_fix",
+    "fix_runs_not_clean",
 )
 
 SHA = re.compile(r"[0-9a-f]{40}")

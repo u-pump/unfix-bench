@@ -1,0 +1,11 @@
+{
+  "source": "freertos",
+  "spdx": "MIT",
+  "fix_date": "2026-11-17",
+  "post_cutoff": true,
+  "upstream_pr": "https://github.com/FreeRTOS/coreHTTP/pull/210",
+  "fuzz_origin": null,
+  "dedupe_key": "FreeRTOS/coreHTTP:fix-accept-zero-length-header-field-continuation-at-receive-boundaries",
+  "mined_run_url": "https://github.com/u-pump/unfix-bench/actions/runs/44512908215",
+  "miner_version": "bench-20-pr6"
+}

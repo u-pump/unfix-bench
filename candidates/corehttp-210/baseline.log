@@ -1,0 +1,13 @@
+=== base: build exit 0
+=== base run 1: 2 ctest tests, failed: core_http_send_utest
+    core_http_send_utest: failing functions: test_HTTPClient_Send_parse_complete_header_field_at_read_boundary
+=== base run 2: 2 ctest tests, failed: core_http_send_utest
+    core_http_send_utest: failing functions: test_HTTPClient_Send_parse_complete_header_field_at_read_boundary
+=== base run 3: 2 ctest tests, failed: core_http_send_utest
+    core_http_send_utest: failing functions: test_HTTPClient_Send_parse_complete_header_field_at_read_boundary
+=== fix: build exit 0
+=== fix run 1: 2 ctest tests, failed: none
+=== fix run 2: 2 ctest tests, failed: none
+=== fix run 3: 2 ctest tests, failed: none
+=== verdict: {"accepted": true, "bug_test": "test_HTTPClient_Send_parse_complete_header_field_at_read_boundary", "bug_test_granularity": "ctest_module", "module": "core_http_send_utest", "module_other_tests": "3/3 pass", "reference_functions": ["test_HTTPClient_Send_parse_complete_header_field_at_read_boundary"]}
+=== elapsed 14.1s

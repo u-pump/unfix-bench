@@ -1,0 +1,34 @@
+{
+  "id": "freertos-plus-tcp-1357",
+  "repo": "https://github.com/FreeRTOS/FreeRTOS-Plus-TCP.git",
+  "base": "97ce2f7c41f7bcd6c388513d6225f81f0b8b872f",
+  "upstream_fix": "4e95d077203b86b103315fa90ad7889077467697",
+  "bug_test": "test_FreeRTOS_inet_ntop6_MaxAddressExactSize",
+  "reference_selection": "first function added or changed by the upstream diff that fails 3/3 on the base; the reference is the whole ctest test FreeRTOS_Sockets_IPv6_utest (ctest_module), no function filter exists",
+  "reference_selection_note": "ctest test FreeRTOS_Sockets_IPv6_utest; changed functions: test_FreeRTOS_inet_ntop6_MaxAddressExactSize",
+  "issue_url": "https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/pull/1357",
+  "fix_url": "https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/commit/4e95d077203b86b103315fa90ad7889077467697",
+  "license": "MIT",
+  "category": "unclassified (the owner sets it)",
+  "build": "cmake -S test/unit-test -B build -G Ninja -DBUILD_CLONE_SUBMODULES=OFF && cmake --build build -j2",
+  "test": "ctest --test-dir build -R '^FreeRTOS_Sockets_IPv6_utest$' --output-on-failure",
+  "bug_test_granularity": "ctest_module",
+  "build_network": "none",
+  "verifier_revision": "a69c6524b9680dd349c511de32a628f40e7dc2a2",
+  "module_other_tests": "3/3 pass",
+  "submodules": [
+    {
+      "commit": "dbf70559b27d39c1fdb68dfb9a32140b6a6777a0",
+      "path": "test/FreeRTOS-Kernel"
+    },
+    {
+      "commit": "bbfaf0425f358f58505710036ed2e0f1bc5cf911",
+      "path": "tools/CMock"
+    }
+  ],
+  "baseline_reproduction": {
+    "verdict": "REPRODUCED",
+    "runs": "3/3",
+    "elapsed_s": 181.2
+  }
+}

@@ -1,0 +1,13 @@
+=== base: build exit 0
+=== base run 1: 60 ctest tests, failed: FreeRTOS_Sockets_IPv6_utest
+    FreeRTOS_Sockets_IPv6_utest: failing functions: test_FreeRTOS_inet_ntop6_MaxAddressExactSize
+=== base run 2: 60 ctest tests, failed: FreeRTOS_Sockets_IPv6_utest
+    FreeRTOS_Sockets_IPv6_utest: failing functions: test_FreeRTOS_inet_ntop6_MaxAddressExactSize
+=== base run 3: 60 ctest tests, failed: FreeRTOS_Sockets_IPv6_utest
+    FreeRTOS_Sockets_IPv6_utest: failing functions: test_FreeRTOS_inet_ntop6_MaxAddressExactSize
+=== fix: build exit 0
+=== fix run 1: 60 ctest tests, failed: none
+=== fix run 2: 60 ctest tests, failed: none
+=== fix run 3: 60 ctest tests, failed: none
+=== verdict: {"accepted": true, "bug_test": "test_FreeRTOS_inet_ntop6_MaxAddressExactSize", "bug_test_granularity": "ctest_module", "module": "FreeRTOS_Sockets_IPv6_utest", "module_other_tests": "3/3 pass", "reference_functions": ["test_FreeRTOS_inet_ntop6_MaxAddressExactSize"]}
+=== elapsed 181.2s

@@ -1,0 +1,11 @@
+{
+  "source": "freertos",
+  "spdx": "MIT",
+  "fix_date": "2024-02-28",
+  "post_cutoff": false,
+  "upstream_pr": "https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/pull/1109",
+  "fuzz_origin": null,
+  "dedupe_key": "FreeRTOS/FreeRTOS-Plus-TCP:fix-dns-to-use-correct-dns-ip-preference",
+  "mined_run_url": "https://github.com/u-pump/unfix-bench/actions/runs/44512908215",
+  "miner_version": "bench-20-pr6"
+}
