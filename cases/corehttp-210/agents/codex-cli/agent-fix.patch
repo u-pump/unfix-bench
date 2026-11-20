@@ -1,0 +1,97 @@
+diff --git a/source/core_http_client.c b/source/core_http_client.c
+index 0539a19..7b842f5 100644
+--- a/source/core_http_client.c
++++ b/source/core_http_client.c
+@@ -717,17 +717,19 @@ static int httpParserOnHeaderFieldCallback( llhttp_t * pHttpParser,
+     assert( pHttpParser->data != NULL );
+     assert( pLoc != NULL );
+ 
+-    if( length == 0U )
+-    {
+-        LogError( ( "Received zero-length header field name from parser." ) );
+-        return LLHTTP_STOP_PARSING;
+-    }
+-
+     pParsingContext = ( HTTPParsingContext_t * ) ( pHttpParser->data );
+     pResponse = pParsingContext->pResponse;
+ 
+     assert( pResponse != NULL );
+ 
++    if( ( length == 0U ) &&
++        ( ( pParsingContext->pLastHeaderField == NULL ) ||
++          ( pParsingContext->pLastHeaderValue != NULL ) ) )
++    {
++        LogError( ( "Received zero-length header field name from parser." ) );
++        return LLHTTP_STOP_PARSING;
++    }
++
+     /* If this is the first time httpParserOnHeaderFieldCallback() has been
+      * invoked on a response, then the start of the response headers is NULL. */
+     if( pResponse->pHeaders == NULL )
+diff --git a/test/unit-test/core_http_send_utest.c b/test/unit-test/core_http_send_utest.c
+index a34ddab..a506faf 100644
+--- a/test/unit-test/core_http_send_utest.c
++++ b/test/unit-test/core_http_send_utest.c
+@@ -108,6 +108,7 @@
+ #define HTTP_TEST_RESPONSE_HEAD_HEADER_COUNT                     7
+ #define HTTP_TEST_RESPONSE_HEAD_CONTENT_LENGTH                   43
+ #define HTTP_TEST_RESPONSE_HEAD_PARTIAL_HEADER_FIELD_LENGTH      ( sizeof( HTTP_STATUS_LINE_OK ) + sizeof( HTTP_TEST_CONTENT_LENGTH_PARTIAL_HEADER_FIELD ) - 2U )
++#define HTTP_TEST_RESPONSE_HEAD_COMPLETE_HEADER_FIELD_LENGTH     ( sizeof( HTTP_STATUS_LINE_OK ) + sizeof( HTTP_CONTENT_LENGTH_FIELD ) - 2U )
+ #define HTTP_TEST_RESPONSE_HEAD_PARTIAL_HEADER_VALUE_LENGTH      ( sizeof( HTTP_STATUS_LINE_OK ) + sizeof( HTTP_TEST_CONTENT_LENGTH_PARTIAL_HEADER_VALUE ) - 2U )
+ 
+ #define HTTP_TEST_RESPONSE_HEAD_2          \
+@@ -684,6 +685,20 @@ static llhttp_errno_t llhttp_execute_partial_header_field( llhttp_t * pParser,
+             return HPE_INVALID_EOF_STATE;
+         }
+ 
++        if( *pNext == ':' )
++        {
++            const char * pHeaderValueStart = NULL;
++
++            TEST_ASSERT_EQUAL( LLHTTP_CONTINUE_PARSING,
++                               pSettings->on_header_field( pParser, pNext, 0 ) );
++            pNext += HTTP_HEADER_FIELD_SEPARATOR_LEN;
++            pHeaderValueStart = pNext;
++            pNext = strstr( pNext, HTTP_HEADER_LINE_SEPARATOR );
++            pSettings->on_header_value( pParser, pHeaderValueStart,
++                                        ( size_t ) ( pNext - pHeaderValueStart ) );
++            pNext += HTTP_HEADER_LINE_SEPARATOR_LEN;
++        }
++
+         helper_parse_headers( &pNext, pParser, pSettings );
+         helper_parse_headers_finish( &pNext, pParser, pSettings, &isHeadResponse );
+         helper_parse_body( &pNext, pParser, pSettings, isHeadResponse, pData, len );
+@@ -1145,6 +1160,33 @@ void test_HTTPClient_Send_parse_partial_header_field( void )
+ 
+ /*-----------------------------------------------------------*/
+ 
++/* Test a read ending exactly after the first header field name. */
++void test_HTTPClient_Send_parse_complete_header_field_at_read_boundary( void )
++{
++    HTTPStatus_t returnStatus = HTTPSuccess;
++
++    llhttp_execute_Stub( llhttp_execute_partial_header_field );
++
++    firstPartBytes = HTTP_TEST_RESPONSE_HEAD_COMPLETE_HEADER_FIELD_LENGTH;
++    returnStatus = HTTPClient_Send( &transportInterface,
++                                    &requestHeaders,
++                                    NULL,
++                                    0,
++                                    &response,
++                                    0 );
++    TEST_ASSERT_EQUAL( HTTPSuccess, returnStatus );
++    TEST_ASSERT_EQUAL( response.pBuffer + ( sizeof( HTTP_STATUS_LINE_OK ) - 1U ), response.pHeaders );
++    TEST_ASSERT_EQUAL( HTTP_TEST_RESPONSE_HEAD_LENGTH - ( sizeof( HTTP_STATUS_LINE_OK ) - 1U ) - HTTP_HEADER_END_INDICATOR_LEN,
++                       response.headersLen );
++    TEST_ASSERT_EQUAL( HTTP_STATUS_CODE_OK, response.statusCode );
++    TEST_ASSERT_EQUAL( HTTP_TEST_RESPONSE_HEAD_CONTENT_LENGTH, response.contentLength );
++    TEST_ASSERT_EQUAL( HTTP_TEST_RESPONSE_HEAD_HEADER_COUNT, response.headerCount );
++    TEST_ASSERT_EQUAL( HTTP_TEST_RESPONSE_HEAD_HEADER_COUNT, headerCallbackCount );
++    TEST_ASSERT_BITS_HIGH( HTTP_RESPONSE_CONNECTION_CLOSE_FLAG, response.respFlags );
++}
++
++/*-----------------------------------------------------------*/
++
+ /* Test successfully parsing a response where up to the middle of a header value
+  * is received on the first network read, then the rest of the response on the
+  * second read. */
