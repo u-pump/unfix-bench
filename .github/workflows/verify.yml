@@ -30,12 +30,19 @@ on:
         description: 'Agent ID (blank means all agents)'
         required: false
         type: string
+      debug_log:
+        description: 'Print the last 200 lines of every cplus call (owner only; the repository is public)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+# Pull requests queue per branch: with one shared group GitHub keeps one running and one pending run and cancels
+# the others, so patches submitted together lost their check. Runs that publish results stay in one group.
 concurrency:
-  group: verify
+  group: ${{ github.event_name == 'pull_request' && format('verify-{0}', github.ref) || 'verify' }}
   cancel-in-progress: false
 
 jobs:
@@ -72,6 +79,7 @@ jobs:
       HEAD_SHA: ${{ github.sha }}
       SELECT_CASE: ${{ inputs.case_id }}
       SELECT_AGENT: ${{ inputs.agent_id }}
+      VERIFY_DEBUG_LOG: ${{ github.event_name == 'workflow_dispatch' && github.actor == 'u-pump' && inputs.debug_log && 'true' || '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
