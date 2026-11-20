@@ -4,9 +4,11 @@ Agent patches in `cases/**/agents/**/agent-fix.patch` modify third-party source 
 
 | Upstream project | Repository | SPDX license | License at case base commit |
 | --- | --- | --- | --- |
+| coreHTTP | [FreeRTOS/coreHTTP](https://github.com/FreeRTOS/coreHTTP) | MIT | [corehttp-210](https://github.com/FreeRTOS/coreHTTP/blob/8dfc2f58dab35b1cb14a3f7eaee1210c144151c1/LICENSE) |
 | coreMQTT | [FreeRTOS/coreMQTT](https://github.com/FreeRTOS/coreMQTT) | MIT | [coremqtt-331](https://github.com/FreeRTOS/coreMQTT/blob/ad72f6aff6c08ac7fe91d7aac0ea6b046b52cd94/LICENSE) |
 | cpp-peglib | [yhirose/cpp-peglib](https://github.com/yhirose/cpp-peglib) | MIT | [cpp-peglib-121](https://github.com/yhirose/cpp-peglib/blob/14305f9f53cde207568f21675a1b9294a3ab28b4/LICENSE) |
 | fmt | [fmtlib/fmt](https://github.com/fmtlib/fmt) | MIT | [fmt-4490](https://github.com/fmtlib/fmt/blob/8f3a965186d49dba299a2302bee1bd093401b969/LICENSE), [fmt-4742](https://github.com/fmtlib/fmt/blob/be98ea8addfd8f0dd6f319e7818f94988728ca0a/LICENSE), [fmt-4800](https://github.com/fmtlib/fmt/blob/e60274b29c0a748df2c6280d0a374e6eef3b6c73/LICENSE), [fmt-4933](https://github.com/fmtlib/fmt/blob/8dc5d3f69f15417d13c60a4a21f7298ed24db41c/LICENSE), [fmt-4942](https://github.com/fmtlib/fmt/blob/fd0a9b6620c8f44fac2122adb1cc29664aa96325/LICENSE), [fmt-4960](https://github.com/fmtlib/fmt/blob/4afd0e498e9e1dd68775cc52087df774a19c761f/LICENSE), [fmt-4978](https://github.com/fmtlib/fmt/blob/89a7f4a7ca354bf008d9810fc86bc06d97631dbc/LICENSE) |
+| FreeRTOS-Plus-TCP | [FreeRTOS/FreeRTOS-Plus-TCP](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP) | MIT | [freertos-plus-tcp-1018](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/blob/222a36dbe3e93783b7aded134b9fa1332c031bb8/LICENSE.md), [freertos-plus-tcp-1158](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/blob/0c8210f450a1bdc27416413c51e82a5b0e4dbe80/LICENSE.md), [freertos-plus-tcp-1357](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/blob/97ce2f7c41f7bcd6c388513d6225f81f0b8b872f/LICENSE.md) |
 | spdlog | [gabime/spdlog](https://github.com/gabime/spdlog) | MIT | [spdlog-3049](https://github.com/gabime/spdlog/blob/6766f873d680e696c29541dbd144f4ef0785f547/LICENSE) |
 | zlib-ng | [zlib-ng/zlib-ng](https://github.com/zlib-ng/zlib-ng) | Zlib | [zlibng-2465](https://github.com/zlib-ng/zlib-ng/blob/75eb731258d9a2dc0fe6180f6d0d45e440da140f/LICENSE.md) |
 

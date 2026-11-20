@@ -11,6 +11,7 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 <!-- results:start -->
 | Case | Project | Bug | Codex CLI | Claude Code |
 | --- | --- | --- | --- | --- |
+| corehttp-210 | [coreHTTP](https://github.com/FreeRTOS/coreHTTP) | [#210: header field at a read boundary](https://github.com/FreeRTOS/coreHTTP/pull/210) | [PENDING](results/corehttp-210/codex-cli.md) | [PENDING](results/corehttp-210/claude-code.md) |
 | coremqtt-331 | [coreMQTT](https://github.com/FreeRTOS/coreMQTT) | [#331: zero-length client identifier](https://github.com/FreeRTOS/coreMQTT/pull/331) | [VERIFIED](results/coremqtt-331/codex-cli.md) | [VERIFIED](results/coremqtt-331/claude-code.md) |
 | cpp-peglib-121 | [cpp-peglib](https://github.com/yhirose/cpp-peglib) | [#121: start rule with ignore operator](https://github.com/yhirose/cpp-peglib/issues/121) | [REJECTED](results/cpp-peglib-121/codex-cli.md) | [REJECTED](results/cpp-peglib-121/claude-code.md) |
 | fmt-4490 | [fmt](https://github.com/fmtlib/fmt) | [#4490: allocator move](https://github.com/fmtlib/fmt/pull/4490) | [REJECTED](results/fmt-4490/codex-cli.md) | [REJECTED](results/fmt-4490/claude-code.md)[^1] |
@@ -20,13 +21,16 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 | fmt-4942 | [fmt](https://github.com/fmtlib/fmt) | [#4942: zero precision](https://github.com/fmtlib/fmt/pull/4942) | [VERIFIED](results/fmt-4942/codex-cli.md) | [REJECTED](results/fmt-4942/claude-code.md) |
 | fmt-4960 | [fmt](https://github.com/fmtlib/fmt) | [#4960: floating-point precision](https://github.com/fmtlib/fmt/pull/4960) | [REJECTED](results/fmt-4960/codex-cli.md) | [VERIFIED](results/fmt-4960/claude-code.md) |
 | fmt-4978 | [fmt](https://github.com/fmtlib/fmt) | [#4978: calendar formatting](https://github.com/fmtlib/fmt/pull/4978) | [VERIFIED](results/fmt-4978/codex-cli.md) | [VERIFIED](results/fmt-4978/claude-code.md) |
+| freertos-plus-tcp-1018 | [FreeRTOS-Plus-TCP](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP) | [#1018: TCP zero-copy send](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/pull/1018) | [PENDING](results/freertos-plus-tcp-1018/codex-cli.md) | [PENDING](results/freertos-plus-tcp-1018/claude-code.md) |
+| freertos-plus-tcp-1158 | [FreeRTOS-Plus-TCP](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP) | [#1158: DNS reply over-read](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/pull/1158) | [PENDING](results/freertos-plus-tcp-1158/codex-cli.md) | [PENDING](results/freertos-plus-tcp-1158/claude-code.md) |
+| freertos-plus-tcp-1357 | [FreeRTOS-Plus-TCP](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP) | [#1357: IPv6 address printing bounds](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/pull/1357) | [PENDING](results/freertos-plus-tcp-1357/codex-cli.md) | [PENDING](results/freertos-plus-tcp-1357/claude-code.md) |
 | spdlog-3049 | [spdlog](https://github.com/gabime/spdlog) | [#3049: concurrent async flush](https://github.com/gabime/spdlog/pull/3049) | [REJECTED](results/spdlog-3049/codex-cli.md) | [REJECTED](results/spdlog-3049/claude-code.md) |
 | zlibng-2465 | [zlib-ng](https://github.com/zlib-ng/zlib-ng) | [#2465: inflate boundary](https://github.com/zlib-ng/zlib-ng/pull/2465) | [VERIFIED](results/zlibng-2465/codex-cli.md) | [VERIFIED](results/zlibng-2465/claude-code.md) |
 
 | Agent | VERIFIED | REJECTED | REVIEW | NOT_VERIFIABLE | NO_PATCH | ERROR | PENDING |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Codex CLI | 5 | 6 | 0 | 0 | 0 | 0 | 0 |
-| Claude Code | 5 | 6 | 0 | 0 | 0 | 0 | 0 |
+| Codex CLI | 5 | 6 | 0 | 0 | 0 | 0 | 4 |
+| Claude Code | 5 | 6 | 0 | 0 | 0 | 0 | 4 |
 <!-- results:end -->
 
 [^1]: По правилу анти-чита с cplus a69c652 этот патч получил бы REVIEW вместо FAIL на анти-чите; результат оставлен на исходной ревизии 81c0fda по протоколу (первые 20 результатов не перепроверяются).
@@ -87,8 +91,8 @@ The focused command above runs the selected `bug_test`; the CTest command runs t
 
 ## Limits
 
-- Eleven cases are a small sample; seven are from fmt. The eleventh, coremqtt-331, is the first Unity case and is judged by cplus; both agents ran once, and both patches were checked again after the verifier revision moved to `a69c652` (the agents were not rerun, see [DECISIONS](docs/DECISIONS.md)).
-- Fix dates of the cases added from BENCH-20 on are recorded in the case (`meta.yaml`: `fix_date`, `post_cutoff`). coremqtt-331: fix 2025-10-30, **fix before 2026-06-30** (`post_cutoff: false`). bench v1 takes fixes merged on or after 2023-01-01, so most of its cases are before that date; the goal of at least half cases after 2026-06-30 belongs to the way to 100 cases, not to v1. The first ten cases carry no such field.
+- Fifteen cases are a small sample; seven are from fmt. The four added last (corehttp-210, freertos-plus-tcp-1018, -1158 and -1357) have not been run by either agent (PENDING) and are judged by cplus like coremqtt-331. The eleventh, coremqtt-331, is the first Unity case and is judged by cplus; both agents ran once, and both patches were checked again after the verifier revision moved to `a69c652` (the agents were not rerun, see [DECISIONS](docs/DECISIONS.md)).
+- Fix dates of the cases added from BENCH-20 on are recorded in the case (`meta.yaml`: `fix_date`, `post_cutoff`). coremqtt-331: fix 2025-10-30, **fix before 2026-06-30** (`post_cutoff: false`). corehttp-210: fix 2026-11-17, **fix after 2026-06-30** (`post_cutoff: true`). freertos-plus-tcp-1018: fix 2023-09-20, before (`false`). freertos-plus-tcp-1158: fix 2024-06-17, before (`false`). freertos-plus-tcp-1357: fix 2026-08-06, **after** (`true`). bench v1 takes fixes merged on or after 2023-01-01, so most of its cases are before that date; the goal of at least half cases after 2026-06-30 belongs to the way to 100 cases, not to v1. The first ten cases carry no such field.
 - In fmt-4960, the reference test was chosen after the agent run. The selection rule was applied retrospectively and documented in [the case file](cases/fmt-4960/case.yaml); the patch was never edited.
 - The verifier is not open source yet. Public reports contain the verdict, eight check statuses, and elapsed time.
 - Each result names the verifier revision it was made with (the `Verifier:` line). All 20 results of the first ten cases were made with `81c0fda` and are not re-checked; cases added later are pinned to a newer revision, shown in their own results.

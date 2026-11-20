@@ -1,6 +1,10 @@
 {
   "note": "HEAD commit of each private u-pump/bench-in-<id> repository, the agent input Codex CLI received. No repository was pushed after the date of its Codex run; for cpp-peglib-121, fmt-4800 and spdlog-3049 the push and the run are on the same day, so their order cannot be shown. See docs/DECISIONS.md, BENCH-13.",
   "inputs": {
+    "corehttp-210": {
+      "commit": "4c3bdf11913f9d39be076caf072a9b3da75f0694",
+      "tree": "e52565a32fef9d711a38feb297408ce852456969"
+    },
     "coremqtt-331": {
       "commit": "aaf83f52ca155b985be017c8722b5f0419e1af36",
       "tree": "beb6df229ba7c65f8bd17c8399adc30207da6546"
@@ -36,6 +40,18 @@
     "fmt-4978": {
       "commit": "d0d95efa4b3ecd343f956bc61091e0b87e4cf2b2",
       "tree": "2e280f9883cab67e136ed94210c6d804d155973f"
+    },
+    "freertos-plus-tcp-1018": {
+      "commit": "6ebf476d08161a60ca9debd5e22cee085fb14c5f",
+      "tree": "62e043b6e6c20f924b27bd462c95fb306c88db54"
+    },
+    "freertos-plus-tcp-1158": {
+      "commit": "e929bea1d61cdc53e1ae0664bc6165b0c7ea138b",
+      "tree": "ed07f29bf9af95d74c37d784c6a83ca85afe4f59"
+    },
+    "freertos-plus-tcp-1357": {
+      "commit": "2624f5fe356b831adb772e4e890cd4e9a2e0e97f",
+      "tree": "7fa979adfc603cbc4f728f104474ad6cbf1c05a1"
     },
     "spdlog-3049": {
       "commit": "e475d9348490eb5c2078e1d4abb9b0700cd4e5df",
