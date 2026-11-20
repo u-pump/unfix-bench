@@ -1,0 +1,52 @@
+diff --git a/source/FreeRTOS_DNS_Parser.c b/source/FreeRTOS_DNS_Parser.c
+index d8f26c1..0b328d1 100644
+--- a/source/FreeRTOS_DNS_Parser.c
++++ b/source/FreeRTOS_DNS_Parser.c
+@@ -646,7 +646,7 @@
+             }
+ 
+             uxResult = DNS_SkipNameField( pxSet->pucByte,
+-                                          sizeof( pxSet->pcName ) );
++                                          pxSet->uxSourceBytesRemaining );
+ 
+             /* Check for a malformed response. */
+             if( uxResult == 0U )
+diff --git a/test/unit-test/FreeRTOS_DNS_Parser/FreeRTOS_DNS_Parser_utest.c b/test/unit-test/FreeRTOS_DNS_Parser/FreeRTOS_DNS_Parser_utest.c
+index 61d2bab..e2dc9cd 100644
+--- a/test/unit-test/FreeRTOS_DNS_Parser/FreeRTOS_DNS_Parser_utest.c
++++ b/test/unit-test/FreeRTOS_DNS_Parser/FreeRTOS_DNS_Parser_utest.c
+@@ -2883,6 +2883,20 @@ void test_parseDNSAnswer_no_answers( void )
+     TEST_ASSERT_EQUAL( 0, uxBytesRead );
+ }
+ 
++void test_parseDNSAnswer_name_exceeds_remaining_bytes( void )
++{
++    uint8_t pucByte[ 2 ] = { 2U, 'a' };
++    size_t uxBytesRead = 0U;
++    ParseSet_t xSet = { 0 };
++
++    xSet.pucByte = pucByte;
++    xSet.uxSourceBytesRemaining = sizeof( pucByte );
++    xSet.usAnswers = 1U;
++
++    TEST_ASSERT_EQUAL( 0U, parseDNSAnswer( &xSet, NULL, &uxBytesRead ) );
++    TEST_ASSERT_EQUAL( 0U, uxBytesRead );
++}
++
+ /**
+  * @brief ensures that when the total bytes is zero no packet is sent over
+  *        the network
+@@ -3064,12 +3078,10 @@ void test_parseDNSAnswer_recordNOTstored_gt_count_diffUsType( void )
+     pxDNSAnswerRecord->usDataLength = FreeRTOS_htons( ipSIZE_OF_IPv4_ADDRESS );
+     pxDNSAnswerRecord->usType = ( dnsTYPE_AAAA_HOST );
+ 
+-    usChar2u16_ExpectAnyArgsAndReturn( dnsTYPE_AAAA_HOST ); /* usType */
+-
+     ret = parseDNSAnswer( &xSet, &pxAddressInfo, &uxBytesRead );
+ 
+     TEST_ASSERT_EQUAL( 0, ret );
+-    TEST_ASSERT_EQUAL( 40, uxBytesRead );
++    TEST_ASSERT_EQUAL( 0, uxBytesRead );
+ }
+ 
+ /**
