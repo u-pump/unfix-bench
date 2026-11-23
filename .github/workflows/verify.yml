@@ -125,6 +125,23 @@ jobs:
         run: |
           shopt -s globstar nullglob
           mkdir -p "$STAGE"
+          # The build tree lives in docker volumes of cplus, not under CPLUS_DATA_DIR/runs.
+          mapfile -t volumes < <(docker volume ls --filter label=project=cplus --format '{{.Name}}')
+          echo "cplus volumes: ${#volumes[@]}"
+          printf '  %s\n' "${volumes[@]}"
+          if [ "${#volumes[@]}" -eq 0 ]; then
+            echo 'no cplus volumes left'
+          else
+            image="$(docker images --format '{{.Repository}}:{{.Tag}}' cplus/cpp-base | grep -v ':<none>' | head -n 1 || true)"
+            image="${image:-alpine}"
+            echo "volume reader image: $image"
+            for volume in "${volumes[@]}"; do
+              mkdir -p "$STAGE/volumes/$volume"
+              docker run --rm -v "$volume":/v:ro -v "$STAGE/volumes/$volume":/out "$image" sh -c \
+                'cd /v && find . \( -path "*/mocks/*.h" -o -path "*/Annexed*/*.h" -o -name CMakeCache.txt -o -name build.ninja -o -name "*.log" \) -type f -exec cp --parents {} /out \; ; chmod -R a+rX /out' \
+                || echo "volume $volume could not be read"
+            done
+          fi
           copy() {
             local file rel
             for file in "$@"; do
