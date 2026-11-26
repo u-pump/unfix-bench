@@ -34,7 +34,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: codex-run
+  group: codex-run-${{ inputs.case_id || 'all' }}
   cancel-in-progress: false
 
 env:
