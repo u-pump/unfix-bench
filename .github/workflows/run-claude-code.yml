@@ -32,7 +32,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: claude-code-run
+  group: claude-code-run-${{ inputs.case_id || 'all' }}
   cancel-in-progress: false
 
 env:
