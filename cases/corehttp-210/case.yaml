@@ -14,7 +14,7 @@
   "test": "ctest --test-dir build -R '^core_http_send_utest$' --output-on-failure",
   "bug_test_granularity": "ctest_module",
   "build_network": "none",
-  "verifier_revision": "dc84e98a80499b118ffb437ce722533fcde03af7",
+  "verifier_revision": "6121ef2a29edca936fdd9f16386782ca748e12fb",
   "module_other_tests": "3/3 pass",
   "submodules": [
     {
