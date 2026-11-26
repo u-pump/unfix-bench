@@ -30,12 +30,19 @@ on:
         description: 'Agent ID (blank means all agents)'
         required: false
         type: string
+      debug_log:
+        description: 'Print the last 200 lines of every cplus call (owner only; the repository is public)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+# Pull requests queue per branch: with one shared group GitHub keeps one running and one pending run and cancels
+# the others, so patches submitted together lost their check. Runs that publish results stay in one group.
 concurrency:
-  group: verify
+  group: ${{ github.event_name == 'pull_request' && format('verify-{0}', github.ref) || 'verify' }}
   cancel-in-progress: false
 
 jobs:
@@ -72,6 +79,7 @@ jobs:
       HEAD_SHA: ${{ github.sha }}
       SELECT_CASE: ${{ inputs.case_id }}
       SELECT_AGENT: ${{ inputs.agent_id }}
+      VERIFY_DEBUG_LOG: ${{ github.event_name == 'workflow_dispatch' && github.actor == 'u-pump' && inputs.debug_log && 'true' || '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -105,6 +113,60 @@ jobs:
           CPLUS_DATA_DIR: ${{ runner.temp }}/cplus-data
           RESULTS_DIR: ${{ runner.temp }}/public-results
         run: python scripts/verify_cases.py
+      - name: Collect cplus debug files
+        id: debug_files
+        # Same gate as VERIFY_DEBUG_LOG: manual run by the owner with debug_log. Upstream sources (MIT) and build
+        # logs only; the secret scan still runs before anything is uploaded.
+        if: ${{ always() && env.VERIFY_DEBUG_LOG == 'true' && steps.install.outcome == 'success' }}
+        env:
+          CPLUS_DATA_DIR: ${{ runner.temp }}/cplus-data
+          CASE_CHECKOUTS: ${{ runner.temp }}/case-checkouts
+          STAGE: ${{ runner.temp }}/cplus-debug
+        run: |
+          shopt -s globstar nullglob
+          mkdir -p "$STAGE"
+          # The build tree lives in docker volumes of cplus, not under CPLUS_DATA_DIR/runs.
+          mapfile -t volumes < <(docker volume ls --filter label=project=cplus --format '{{.Name}}')
+          echo "cplus volumes: ${#volumes[@]}"
+          printf '  %s\n' "${volumes[@]}"
+          if [ "${#volumes[@]}" -eq 0 ]; then
+            echo 'no cplus volumes left'
+          else
+            image="$(docker images --format '{{.Repository}}:{{.Tag}}' cplus/cpp-base | grep -v ':<none>' | head -n 1 || true)"
+            image="${image:-alpine}"
+            echo "volume reader image: $image"
+            for volume in "${volumes[@]}"; do
+              mkdir -p "$STAGE/volumes/$volume"
+              docker run --rm -v "$volume":/v:ro -v "$STAGE/volumes/$volume":/out "$image" sh -c \
+                'cd /v && find . \( -path "*/mocks/*.h" -o -path "*/Annexed*/*.h" -o -name CMakeCache.txt -o -name build.ninja -o -name "*.log" \) -type f -exec cp --parents {} /out \; ; chmod -R a+rX /out' \
+                || echo "volume $volume could not be read"
+            done
+          fi
+          copy() {
+            local file rel
+            for file in "$@"; do
+              [ -f "$file" ] || continue
+              rel="${file#"$CPLUS_DATA_DIR"/}"
+              rel="${rel#"$CASE_CHECKOUTS"/}"
+              mkdir -p "$STAGE/$(dirname "$rel")"
+              cp "$file" "$STAGE/$rel"
+            done
+          }
+          copy "$CPLUS_DATA_DIR"/runs/**/build.log                "$CPLUS_DATA_DIR"/runs/**/build*/mocks/*.h                "$CPLUS_DATA_DIR"/runs/**/build*/Annexed*/**/*.h                "$CPLUS_DATA_DIR"/runs/**/build*/CMakeCache.txt                "$CPLUS_DATA_DIR"/runs/**/build*/build.ninja                "$CASE_CHECKOUTS"/**/cplus.yaml
+          mapfile -t files < <(find "$STAGE" -type f)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo 'No debug files found.'
+            exit 0
+          fi
+          python scripts/collect_agent_run.py scan "${files[@]}"
+          echo 'available=true' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ always() && steps.debug_files.outputs.available == 'true' }}
+        with:
+          name: cplus-debug-${{ inputs.case_id || 'all' }}
+          path: ${{ runner.temp }}/cplus-debug/
+          if-no-files-found: error
+          retention-days: 3
       - name: Detect generated results
         id: results
         if: ${{ always() && (steps.install.outcome == 'success' || steps.install.outcome == 'skipped') && (steps.verify_cases.outcome == 'success' || steps.verify_cases.outcome == 'failure') }}
