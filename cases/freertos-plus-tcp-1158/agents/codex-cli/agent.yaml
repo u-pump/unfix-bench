@@ -11,6 +11,22 @@
   "session_id": "01a1fa0b-c781-7e80-acf4-6334c4e85bb2",
   "patch_sha256": "b747ce7ab7d12d489f15d2e74b7b097365bf5a0b3bf0df2b3c138912b7288c02",
   "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "verdict_history": [
+    {
+      "verdict": "INFRASTRUCTURE_ERROR",
+      "reason": "cplus bug baseline: reference test did not reproduce",
+      "verifier": "cplus a69c6524b9680dd349c511de32a628f40e7dc2a2",
+      "checked_utc": "2026-11-20 17:44:50",
+      "note": "limitation of the verifier (FreeRTOS-Plus-TCP was configured twice, c-plus #113), not a verdict on the patch"
+    },
+    {
+      "verdict": "REJECTED",
+      "reason": "anti_cheat FAIL: the patch changes a protected test (test/unit-test/FreeRTOS_DNS_Parser/FreeRTOS_DNS_Parser_utest.c, line 3072)",
+      "verifier": "cplus dc84e98a80499b118ffb437ce722533fcde03af7",
+      "checked_utc": "2026-11-26 16:03:13",
+      "note": "same patch (sha256 b747ce7a...), agent not rerun; verify run 45855038692; the patch removes usChar2u16_ExpectAnyArgsAndReturn and changes an expected value from 40 to 0 in an existing test"
+    }
+  ],
   "metrics": {
     "bash_commands": 26,
     "tool_calls": 29,
