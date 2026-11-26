@@ -56,11 +56,18 @@ class WorkflowTest(unittest.TestCase):
 
     def test_model_effort_and_the_newest_version_are_the_ones_the_first_ten_cases_used(self) -> None:
         recorded = []
+        with_patch = 0
         for path in sorted((ROOT / "cases").glob("*/agents/codex-cli/agent.yaml")):
             data = json.loads(path.read_text(encoding="utf-8"))
+            if data.get("patch_sha256"):
+                with_patch += 1
             if data.get("version"):
                 recorded.append((data["version"], data["model"], data["reasoning"]))
-        self.assertEqual(len(recorded), 11)  # ten first cases and coremqtt-331 (same model, effort and version)
+        # The count grows with every merged Codex attempt of a later batch, so it is not a constant: a case counts
+        # as recorded when its agent.yaml names a version, and that must be exactly the cases that saved a patch.
+        # The ten first cases and coremqtt-331 are the floor; a placeholder (all null) stays out of the count.
+        self.assertGreaterEqual(len(recorded), 11)
+        self.assertEqual(len(recorded), with_patch)
         self.assertEqual({(model, effort) for _, model, effort in recorded}, {("gpt-6-sol", "medium")})
         newest = max((tuple(int(x) for x in version.split(".")), version) for version, _, _ in recorded)[1]
         self.assertIn(f"ARG CODEX_CLI_VERSION={newest}", DOCKERFILE)  # eight cases used it, two used 0.163.0
