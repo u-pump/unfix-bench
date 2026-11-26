@@ -1,0 +1,45 @@
+diff --git a/source/FreeRTOS_IPv6_Sockets.c b/source/FreeRTOS_IPv6_Sockets.c
+index 5e5744d..a47c2df 100644
+--- a/source/FreeRTOS_IPv6_Sockets.c
++++ b/source/FreeRTOS_IPv6_Sockets.c
+@@ -437,9 +437,9 @@ const char * FreeRTOS_inet_ntop6( const void * pvSource,
+         }
+     }
+ 
+-    if( xSet.xIndex < 8 )
++    if( ( xSet.xIndex < 8 ) || ( xSet.uxTargetIndex >= uxSize ) )
+     {
+-        /* Didn't reach the last nibble: clear the string. */
++        /* The address or its terminator did not fit. */
+         pcReturn = NULL;
+     }
+     else
+diff --git a/test/unit-test/FreeRTOS_Sockets_IPv6/FreeRTOS_Sockets_IPv6_utest.c b/test/unit-test/FreeRTOS_Sockets_IPv6/FreeRTOS_Sockets_IPv6_utest.c
+index b795313..9241e29 100644
+--- a/test/unit-test/FreeRTOS_Sockets_IPv6/FreeRTOS_Sockets_IPv6_utest.c
++++ b/test/unit-test/FreeRTOS_Sockets_IPv6/FreeRTOS_Sockets_IPv6_utest.c
+@@ -841,6 +841,24 @@ void test_FreeRTOS_inet_ntop6_HappyPath4( void )
+     TEST_ASSERT_EQUAL_MEMORY( "fe80::", pcReturn, 7 );
+ }
+ 
++void test_FreeRTOS_inet_ntop6_MaxLengthNeedsTerminatorSpace( void )
++{
++    uint8_t ucAddress[ 16 ];
++    char cDestination[ NTOP_CHAR_BUFFER_SIZE ] = { '\0' };
++
++    ( void ) memset( ucAddress, 0xff, sizeof( ucAddress ) );
++    cDestination[ 39 ] = 'X';
++    cDestination[ 40 ] = 'Y';
++
++    TEST_ASSERT_NULL( FreeRTOS_inet_ntop6( ucAddress, cDestination, 39 ) );
++    TEST_ASSERT_EQUAL_CHAR( 'X', cDestination[ 39 ] );
++    TEST_ASSERT_EQUAL_CHAR( 'Y', cDestination[ 40 ] );
++
++    TEST_ASSERT_EQUAL_PTR( cDestination, FreeRTOS_inet_ntop6( ucAddress, cDestination, 40 ) );
++    TEST_ASSERT_EQUAL_STRING( "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", cDestination );
++    TEST_ASSERT_EQUAL_CHAR( 'Y', cDestination[ 40 ] );
++}
++
+ /**
+  * @brief Case where the destination buffer size is lesser than required
+  *        when writing zeroes..
