@@ -11,6 +11,21 @@
   "session_id": "01a21943-0adc-7670-aa20-df461a2b8bca",
   "patch_sha256": "724260f5d1ee2abb4b22aa3958e7fafcf1a473c2fc8a85cce4b0c473ec7c215e",
   "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "verdict_history": [
+    {
+      "verdict": "REJECTED",
+      "reason": "anti_cheat FAIL: the patch changes a protected test (test/unit-test/FreeRTOS_Sockets/FreeRTOS_Sockets_TCP_API_utest.c, line 1261)",
+      "verifier": "cplus dc84e98a80499b118ffb437ce722533fcde03af7",
+      "checked_utc": "2026-11-26 19:13:56"
+    },
+    {
+      "verdict": "REJECTED",
+      "reason": "anti_cheat FAIL: the patch changes a protected test (test/unit-test/FreeRTOS_Sockets/FreeRTOS_Sockets_TCP_API_utest.c, line 1261)",
+      "verifier": "cplus 6121ef2a29edca936fdd9f16386782ca748e12fb",
+      "checked_utc": "2026-11-26 20:16:27",
+      "note": "same patch (sha256 724260f5...), agent not rerun; verdict unchanged on the new revision; verify run 45889780497; the test edit does not match the reference hunk: the test is renamed and rewritten (test_FreeRTOS_send_NULLBuffer, other expectations) and a source line the upstream fix does not touch is changed"
+    }
+  ],
   "metrics": {
     "bash_commands": 28,
     "tool_calls": 30,
