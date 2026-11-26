@@ -1,10 +1,56 @@
 {
   "name": "Codex CLI",
-  "version": null,
-  "model": null,
-  "invocation": null,
-  "date_utc": null,
-  "environment": null,
-  "patch_sha256": null,
-  "attempt_note": null
+  "version": "0.164.0",
+  "model": "gpt-6-sol",
+  "requested_model": "gpt-6-sol",
+  "model_source": "requested (the Codex transcript does not name the model)",
+  "reasoning": "medium",
+  "date_utc": "2026-11-26T19:13:21Z",
+  "environment": "GitHub Actions ubuntu-latest; agent in a Docker container (read-only root, non-root uid, writable only /work and a tmpfs home, all capabilities dropped); container network is internal and egress goes through a proxy that allows only api.openai.com:443; Codex's own sandbox bypassed (the container is the sandbox), no web search, apps, browser, plugins, hooks or AGENTS.md",
+  "invocation": "codex exec --json --ephemeral --skip-git-repo-check --ignore-user-config --ignore-rules --strict-config --dangerously-bypass-approvals-and-sandbox -c model_reasoning_effort=\"medium\" -c web_search=\"disabled\" -c project_doc_max_bytes=0 --disable apps --disable browser_use --disable computer_use --disable plugins --disable hooks --disable multi_agent --disable image_generation -m gpt-6-sol - (task text on stdin)",
+  "session_id": "01a21943-0adc-7670-aa20-df461a2b8bca",
+  "patch_sha256": "724260f5d1ee2abb4b22aa3958e7fafcf1a473c2fc8a85cce4b0c473ec7c215e",
+  "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "verdict_history": [
+    {
+      "verdict": "REJECTED",
+      "reason": "anti_cheat FAIL: the patch changes a protected test (test/unit-test/FreeRTOS_Sockets/FreeRTOS_Sockets_TCP_API_utest.c, line 1261)",
+      "verifier": "cplus dc84e98a80499b118ffb437ce722533fcde03af7",
+      "checked_utc": "2026-11-26 19:13:56"
+    },
+    {
+      "verdict": "REJECTED",
+      "reason": "anti_cheat FAIL: the patch changes a protected test (test/unit-test/FreeRTOS_Sockets/FreeRTOS_Sockets_TCP_API_utest.c, line 1261)",
+      "verifier": "cplus 6121ef2a29edca936fdd9f16386782ca748e12fb",
+      "checked_utc": "2026-11-26 20:16:27",
+      "note": "same patch (sha256 724260f5...), agent not rerun; verdict unchanged on the new revision; verify run 45889780497; the test edit does not match the reference hunk: the test is renamed and rewritten (test_FreeRTOS_send_NULLBuffer, other expectations) and a source line the upstream fix does not touch is changed"
+    }
+  ],
+  "metrics": {
+    "bash_commands": 28,
+    "tool_calls": 30,
+    "turns": 1,
+    "duration_seconds": 248,
+    "tokens": {
+      "input": 1262760,
+      "cached_input": 1214691,
+      "output": 4370,
+      "reasoning_output": 659
+    }
+  },
+  "network_commands_seen_in_transcript": [],
+  "proxy": {
+    "refused_requests": 20,
+    "refused": {
+      "ab.chatgpt.com": 5,
+      "chatgpt.com": 15
+    },
+    "allowed_connections": {
+      "api.openai.com": 1
+    },
+    "scope": "agent run only, counted from the proxy log; the isolation proof's requests are excluded"
+  },
+  "run_url": "https://github.com/u-pump/unfix-bench/actions/runs/45881136727",
+  "image": "sha256:1cfa35bedce8e4edf510100b208fbcc3bb5ed8e3cccf28e0884b5fa98b0bfd36",
+  "network_proof": "all isolation proofs passed before the run; log in the run artifact"
 }

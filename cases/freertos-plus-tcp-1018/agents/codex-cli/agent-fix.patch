@@ -1,0 +1,83 @@
+diff --git a/source/FreeRTOS_Sockets.c b/source/FreeRTOS_Sockets.c
+index 9fd643b..127dbe1 100644
+--- a/source/FreeRTOS_Sockets.c
++++ b/source/FreeRTOS_Sockets.c
+@@ -4503,7 +4503,7 @@ void vSocketWakeUpUser( FreeRTOS_Socket_t * pxSocket )
+                 xBytesLeft -= xByteCount;
+                 xBytesSent += xByteCount;
+ 
+-                if( ( xBytesLeft == 0 ) && ( pvBuffer == NULL ) )
++                if( pvBuffer == NULL )
+                 {
+                     /* pvBuffer can be NULL in case TCP zero-copy transmissions are used. */
+                     break;
+@@ -4597,13 +4597,10 @@ void vSocketWakeUpUser( FreeRTOS_Socket_t * pxSocket )
+         BaseType_t xByteCount = -pdFREERTOS_ERRNO_EINVAL;
+         FreeRTOS_Socket_t * pxSocket = ( FreeRTOS_Socket_t * ) xSocket;
+ 
+-        if( pvBuffer != NULL )
+-        {
+-            /* Check if this is a valid TCP socket, affirm that it is not closed or closing,
+-             * affirm that there was not malloc-problem, test if uxDataLength is non-zero,
+-             * and if the connection is not in a confirmed FIN state. */
+-            xByteCount = ( BaseType_t ) prvTCPSendCheck( pxSocket, uxDataLength );
+-        }
++        /* Check if this is a valid TCP socket, affirm that it is not closed or closing,
++         * affirm that there was not malloc-problem, test if uxDataLength is non-zero,
++         * and if the connection is not in a confirmed FIN state. */
++        xByteCount = ( BaseType_t ) prvTCPSendCheck( pxSocket, uxDataLength );
+ 
+         if( xByteCount > 0 )
+         {
+diff --git a/test/unit-test/FreeRTOS_Sockets/FreeRTOS_Sockets_TCP_API_utest.c b/test/unit-test/FreeRTOS_Sockets/FreeRTOS_Sockets_TCP_API_utest.c
+index 0b15020..f447579 100644
+--- a/test/unit-test/FreeRTOS_Sockets/FreeRTOS_Sockets_TCP_API_utest.c
++++ b/test/unit-test/FreeRTOS_Sockets/FreeRTOS_Sockets_TCP_API_utest.c
+@@ -1233,20 +1233,17 @@ void test_FreeRTOS_send_DisconnectionOccursDuringWait( void )
+ }
+ 
+ /*
+- * @brief IP task is calling send function with a NULL buffer. Also there are 20 bytes worth of space
+- *        less in the stream buffer as the data length.
++ * @brief A NULL buffer advances the transmit stream head by the available space.
+  */
+-void test_FreeRTOS_send_IPTaskWithNULLBuffer( void )
++void test_FreeRTOS_send_NULLBuffer( void )
+ {
+     BaseType_t xReturn;
+     FreeRTOS_Socket_t xSocket;
+-    uint8_t pvBuffer[ ipconfigTCP_MSS ];
+     size_t uxDataLength;
+     BaseType_t xFlags = 0;
+     StreamBuffer_t xLocalStreamBuffer;
+ 
+     memset( &xSocket, 0, sizeof( xSocket ) );
+-    memset( pvBuffer, 0, ipconfigTCP_MSS );
+ 
+     xSocket.ucProtocol = FREERTOS_IPPROTO_TCP;
+     xSocket.u.xTCP.eTCPState = eESTABLISHED;
+@@ -1255,10 +1252,23 @@ void test_FreeRTOS_send_IPTaskWithNULLBuffer( void )
+     xSocket.xSendBlockTime = 100;
+ 
+     uxDataLength = 100;
++    listLIST_ITEM_CONTAINER_ExpectAnyArgsAndReturn( &xBoundTCPSocketsList );
++    uxStreamBufferGetSpace_ExpectAndReturn( xSocket.u.xTCP.txStream, uxDataLength - 20 );
++    uxStreamBufferAdd_ExpectAndReturn( xSocket.u.xTCP.txStream, 0U, NULL, uxDataLength - 20, uxDataLength - 20 );
++    xIsCallingFromIPTask_ExpectAndReturn( pdFALSE );
++    xSendEventToIPTask_ExpectAndReturn( eTCPTimerEvent, pdFALSE );
+ 
+     xReturn = FreeRTOS_send( &xSocket, NULL, uxDataLength, xFlags );
++    TEST_ASSERT_EQUAL( uxDataLength - 20, xReturn );
+ 
+-    TEST_ASSERT_EQUAL( -pdFREERTOS_ERRNO_EINVAL, xReturn );
++    listLIST_ITEM_CONTAINER_ExpectAnyArgsAndReturn( &xBoundTCPSocketsList );
++    uxStreamBufferGetSpace_ExpectAndReturn( xSocket.u.xTCP.txStream, uxDataLength );
++    uxStreamBufferAdd_ExpectAndReturn( xSocket.u.xTCP.txStream, 0U, NULL, uxDataLength, uxDataLength );
++    xIsCallingFromIPTask_ExpectAndReturn( pdFALSE );
++    xSendEventToIPTask_ExpectAndReturn( eTCPTimerEvent, pdFALSE );
++
++    xReturn = FreeRTOS_send( &xSocket, NULL, uxDataLength, xFlags );
++    TEST_ASSERT_EQUAL( uxDataLength, xReturn );
+ }
+ 
+ /**
