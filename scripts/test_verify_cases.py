@@ -497,9 +497,85 @@ class VerifyCasesSmokeTest(unittest.TestCase):
             self.assertIn("Agent: not run · Version: not recorded", result)
 
 
-def completed(stdout: str, returncode: int = 0):
+class CplusDiagnosticsTest(unittest.TestCase):
+    def test_whitelisted_line_is_cleaned(self) -> None:
+        stderr = "noise\n\x1b[31mCould not reproduce bug: build problem: linker error in project code\x1b[0m\n"
+        self.assertEqual(verify_cases.cplus_diagnostic(stderr), "build problem: linker error in project code")
+        self.assertEqual(
+            verify_cases.cplus_diagnostic("Could not reproduce bug: timed out after 600 s while building build"),
+            "timed out after 600 s while building build")
+        self.assertEqual(
+            verify_cases.cplus_diagnostic("Could not reproduce bug: sandbox failed: docker said no"),
+            "sandbox failed: docker said no")
+        self.assertTrue(verify_cases.cplus_diagnostic(
+            "Could not reproduce bug: build environment problem: no such image").startswith("build environment problem"))
+
+    def test_paths_are_removed_and_length_is_capped(self) -> None:
+        line = verify_cases.cplus_diagnostic(
+            "Could not reproduce bug: build problem: C:\\runner\\work\\x.c and /home/runner/work/y.c failed")
+        self.assertEqual(line, "build problem: [path] and [path] failed")
+        long = verify_cases.cplus_diagnostic("Could not reproduce bug: build problem: " + "x" * 500)
+        self.assertEqual(len(long), 240)
+
+    def test_other_text_is_not_public(self) -> None:
+        for stderr in ("", None, "Traceback (most recent call last):\n  File x\nValueError: boom",
+                       "PRIVATE_CPLUS_LOG secret", "build problem: see stderr dump",
+                       "build problem: ::set-output name=x::y"):
+            self.assertIsNone(verify_cases.cplus_diagnostic(stderr), stderr)
+
+    def run_failing_bug(self, stderr: str, env: dict[str, str] | None = None):
+        with tempfile.TemporaryDirectory() as directory:
+            temp = Path(directory)
+
+            def fake_quiet(*args: str, cwd: Path | None = None):
+                if args[:2] == ("git", "clone"):
+                    Path(args[-1]).mkdir(parents=True, exist_ok=True)
+                if args[:2] == ("git", "diff"):
+                    return completed("diff --git a/a b/a\n")
+                if args[:2] == ("cplus", "bug"):
+                    return completed("partial stdout line", 4, stderr)
+                return completed("")
+
+            out = io.StringIO()
+            with (patch.object(verify_cases, "TEMP", temp),
+                  patch.object(verify_cases, "quiet", side_effect=fake_quiet),
+                  patch.dict("os.environ", env or {}, clear=False),
+                  contextlib.redirect_stdout(out)):
+                with self.assertRaises(verify_cases.CaseExecutionError) as caught:
+                    verify_cases.run_case("cpp-peglib-121", "codex-cli")
+            log = (temp / "cplus-cpp-peglib-121-codex-cli.log").read_text(encoding="utf-8")
+            return caught.exception, out.getvalue(), log
+
+    def test_reason_carries_the_cplus_line(self) -> None:
+        error, out, log = self.run_failing_bug(
+            "PRIVATE_CPLUS_LOG\nCould not reproduce bug: build problem: linker error in project code\n")
+        self.assertEqual(error.public_reason, "cplus bug baseline: build problem: linker error in project code")
+        self.assertIn("cplus bug returncode=4; build problem: linker error in project code", out)
+        self.assertNotIn("PRIVATE_CPLUS_LOG", out)
+        self.assertNotIn("::group::", out)
+        self.assertIn("PRIVATE_CPLUS_LOG", log)
+        self.assertIn("partial stdout line", log)
+
+    def test_reason_falls_back_when_nothing_is_whitelisted(self) -> None:
+        error, out, _ = self.run_failing_bug("PRIVATE_CPLUS_LOG D:\\runner")
+        self.assertEqual(error.public_reason, "cplus bug baseline: reference test did not reproduce")
+        self.assertIn("cplus bug returncode=4", out)
+        self.assertNotIn("PRIVATE_CPLUS_LOG", out)
+
+    def test_debug_log_prints_an_indented_tail_only_when_asked(self) -> None:
+        stderr = "\n".join(f"line {n}" for n in range(300)) + "\n::error::injected\n"
+        _, out, _ = self.run_failing_bug(stderr, {"VERIFY_DEBUG_LOG": "true"})
+        self.assertIn("::group::", out)
+        self.assertIn("::endgroup::", out)
+        self.assertIn("  ::error::injected", out)
+        self.assertNotIn("\n::error::", out)
+        self.assertNotIn("line 10\n", out)
+        self.assertLessEqual(len([row for row in out.splitlines() if row.startswith("  ")]), 200)
+
+
+def completed(stdout: str, returncode: int = 0, stderr: str = ""):
     from subprocess import CompletedProcess
-    return CompletedProcess(args=(), returncode=returncode, stdout=stdout, stderr="")
+    return CompletedProcess(args=(), returncode=returncode, stdout=stdout, stderr=stderr)
 
 
 if __name__ == "__main__":
