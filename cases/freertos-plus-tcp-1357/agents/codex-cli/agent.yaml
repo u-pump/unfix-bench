@@ -11,6 +11,21 @@
   "session_id": "01a1fa04-cc54-7dd3-b9c2-1b98211d0a8d",
   "patch_sha256": "af8600f6bf498fd71a3db78e6b6ed37a9603ea9927f467513795d1cd8d092be9",
   "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "verdict_history": [
+    {
+      "verdict": "INFRASTRUCTURE_ERROR",
+      "reason": "cplus bug baseline: reference test did not reproduce",
+      "verifier": "cplus a69c6524b9680dd349c511de32a628f40e7dc2a2",
+      "checked_utc": "2026-11-20 17:34:56",
+      "note": "limitation of the verifier (FreeRTOS-Plus-TCP was configured twice, c-plus #113), not a verdict on the patch"
+    },
+    {
+      "verdict": "VERIFIED",
+      "verifier": "cplus dc84e98a80499b118ffb437ce722533fcde03af7",
+      "checked_utc": "2026-11-26 15:42:21",
+      "note": "same patch (sha256 af8600f6...), agent not rerun; 8 of 8 gates PASS; verify run 45851664579"
+    }
+  ],
   "metrics": {
     "bash_commands": 14,
     "tool_calls": 16,
