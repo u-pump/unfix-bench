@@ -10,6 +10,21 @@
   "session_id": "43f12bb4-bb39-435b-bfe2-c3cdc37325bf",
   "patch_sha256": "9a73359e53d4b8f3c5e5358544a31afe68aeb7bd41f8fbc40358b402af11b01f",
   "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "verdict_history": [
+    {
+      "verdict": "REJECTED",
+      "reason": "anti_cheat FAIL: the patch changes a protected test (test/unit-test/FreeRTOS_DNS_Parser/FreeRTOS_DNS_Parser_utest.c, line 3072)",
+      "verifier": "cplus dc84e98a80499b118ffb437ce722533fcde03af7",
+      "checked_utc": "2026-11-26 18:21:04",
+      "note": "limitation of the verifier (an agent edit identical to the upstream hunk of the reference was counted as a violation, c-plus #114), not a verdict on the patch"
+    },
+    {
+      "verdict": "VERIFIED",
+      "verifier": "cplus 6121ef2a29edca936fdd9f16386782ca748e12fb",
+      "checked_utc": "2026-11-26 20:07:22",
+      "note": "same patch (sha256 9a73359e...), agent not rerun; 8 of 8 gates PASS; verify run 45888651481"
+    }
+  ],
   "metrics": {
     "bash_commands": 10,
     "tool_calls": 17,
