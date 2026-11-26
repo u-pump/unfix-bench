@@ -11,7 +11,7 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 <!-- results:start -->
 | Case | Project | Bug | Codex CLI | Claude Code |
 | --- | --- | --- | --- | --- |
-| corehttp-210 | [coreHTTP](https://github.com/FreeRTOS/coreHTTP) | [#210: header field at a read boundary](https://github.com/FreeRTOS/coreHTTP/pull/210) | [PENDING](results/corehttp-210/codex-cli.md) | [VERIFIED](results/corehttp-210/claude-code.md) |
+| corehttp-210 | [coreHTTP](https://github.com/FreeRTOS/coreHTTP) | [#210: header field at a read boundary](https://github.com/FreeRTOS/coreHTTP/pull/210) | [REJECTED](results/corehttp-210/codex-cli.md) | [VERIFIED](results/corehttp-210/claude-code.md) |
 | coremqtt-331 | [coreMQTT](https://github.com/FreeRTOS/coreMQTT) | [#331: zero-length client identifier](https://github.com/FreeRTOS/coreMQTT/pull/331) | [VERIFIED](results/coremqtt-331/codex-cli.md) | [VERIFIED](results/coremqtt-331/claude-code.md) |
 | cpp-peglib-121 | [cpp-peglib](https://github.com/yhirose/cpp-peglib) | [#121: start rule with ignore operator](https://github.com/yhirose/cpp-peglib/issues/121) | [REJECTED](results/cpp-peglib-121/codex-cli.md) | [REJECTED](results/cpp-peglib-121/claude-code.md) |
 | fmt-4490 | [fmt](https://github.com/fmtlib/fmt) | [#4490: allocator move](https://github.com/fmtlib/fmt/pull/4490) | [REJECTED](results/fmt-4490/codex-cli.md) | [REJECTED](results/fmt-4490/claude-code.md)[^1] |
@@ -29,7 +29,7 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 
 | Agent | VERIFIED | REJECTED | REVIEW | NOT_VERIFIABLE | NO_PATCH | ERROR | PENDING |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Codex CLI | 6 | 7 | 0 | 0 | 0 | 0 | 2 |
+| Codex CLI | 6 | 8 | 0 | 0 | 0 | 0 | 1 |
 | Claude Code | 7 | 7 | 0 | 0 | 0 | 0 | 1 |
 <!-- results:end -->
 
