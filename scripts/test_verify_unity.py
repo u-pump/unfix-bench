@@ -108,7 +108,7 @@ class RevisionPerCaseTest(unittest.TestCase):
         self.assertEqual(verify_cases.VERIFIER_REVISION, LEGACY)
 
     def test_a_new_case_names_its_revision_and_drafts_carry_it(self) -> None:
-        self.assertEqual(NEW, "dc84e98a80499b118ffb437ce722533fcde03af7")
+        self.assertEqual(NEW, "6121ef2a29edca936fdd9f16386782ca748e12fb")
         self.assertNotEqual(NEW, LEGACY)
         with tempfile.TemporaryDirectory() as tmp, patch.object(verify_cases, "ROOT", Path(tmp)):
             lay_out(Path(tmp), unity_case())
