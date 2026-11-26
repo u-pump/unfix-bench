@@ -4,11 +4,13 @@ Verdict: **REJECTED**
 
 Reason: the patch changes protected tests or check configuration; test/unit-test/FreeRTOS_Sockets/FreeRTOS_Sockets_TCP_API_utest.c, line 1261
 
+Attempt: Same patch (sha256 79651013...), same single agent run (run 44784613157), not rerun. First verdict REJECTED on cplus a69c652 (2026-11-20 17:44:56 UTC): anti_cheat FAIL, the patch changes an existing protected test. Checked again on cplus dc84e98, the revision now set for this case: REJECTED again for the same reason; the verdict above is the current one.
+
 Network: the proxy refused 0 request(s) from the agent run (none); allowed connections: api.anthropic.com x3. Counted from the proxy log; the isolation proof's own requests are excluded.
 
-Elapsed: 0.8 s
+Elapsed: 0.6 s
 
-Verifier: cplus a69c6524b9680dd349c511de32a628f40e7dc2a2 · 2026-11-20 17:44:56 UTC
+Verifier: cplus dc84e98a80499b118ffb437ce722533fcde03af7 · 2026-11-26 17:49:44 UTC
 
 Reference: ctest_module (module FreeRTOS_Sockets_TCP_API_utest; only tests added by the fix fail on the base)
 
