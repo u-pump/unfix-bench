@@ -1,10 +1,50 @@
 {
   "name": "Claude Code",
-  "version": null,
-  "model": null,
-  "invocation": null,
-  "date_utc": null,
-  "environment": null,
-  "patch_sha256": null,
-  "attempt_note": null
+  "version": "2.1.323 (Claude Code)",
+  "model": "claude-opus-5-5",
+  "requested_model": "claude-opus-5-5",
+  "effort": "default (not set)",
+  "date_utc": "2026-11-20T18:43:21Z",
+  "environment": "GitHub Actions ubuntu-latest; agent in a Docker container (read-only root, non-root uid, writable only /work and a tmpfs home, all capabilities dropped); container network is internal and egress goes through a proxy that allows only api.anthropic.com:443; --safe-mode, no web tools, no MCP, no memory or CLAUDE.md",
+  "invocation": "claude -p --output-format stream-json --verbose --no-session-persistence --safe-mode --strict-mcp-config --disable-slash-commands --permission-mode acceptEdits --permission-prompts none --tools Bash,Read,Edit,Write,Glob,Grep --allowedTools Bash,Read,Edit,Write,Glob,Grep --disallowedTools WebSearch,WebFetch --model claude-opus-5-5 (task text on stdin)",
+  "session_id": "fa173998-b6d2-4562-888b-6ce0f057f193",
+  "patch_sha256": "79462f3a4cd2caddc9aebfd2dc07a88921bf6ec1128c9b1d6253341c7b905bc6",
+  "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "verdict_history": [
+    {
+      "verdict": "VERIFIED",
+      "verifier": "cplus a69c6524b9680dd349c511de32a628f40e7dc2a2",
+      "checked_utc": "2026-11-20 18:43:50"
+    },
+    {
+      "verdict": "VERIFIED",
+      "verifier": "cplus dc84e98a80499b118ffb437ce722533fcde03af7",
+      "checked_utc": "2026-11-26 16:31:01",
+      "note": "same patch (sha256 79462f3a...), agent not rerun; verdict unchanged on the new revision; 8 of 8 gates PASS; verify run 45859420507"
+    }
+  ],
+  "metrics": {
+    "bash_commands": 9,
+    "tool_calls": 13,
+    "turns": 14,
+    "duration_seconds": 44,
+    "tokens": {
+      "input": 26,
+      "output": 3001,
+      "cache_creation_input": 15876,
+      "cache_read_input": 195704
+    }
+  },
+  "network_commands_seen_in_transcript": [],
+  "proxy": {
+    "refused_requests": 0,
+    "refused": {},
+    "allowed_connections": {
+      "api.anthropic.com": 3
+    },
+    "scope": "agent run only, counted from the proxy log; the isolation proof's requests are excluded"
+  },
+  "run_url": "https://github.com/u-pump/unfix-bench/actions/runs/44794967422",
+  "image": "sha256:5b8bd64f1887acc2b55e02e1218d45148c1c22d7fc44f9209b321b7c6ef3d3e6",
+  "network_proof": "all isolation proofs passed before the run; log in the run artifact"
 }

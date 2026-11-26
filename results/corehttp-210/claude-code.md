@@ -1,24 +1,28 @@
 # corehttp-210
 
-Verdict: **PENDING**
+Verdict: **VERIFIED**
 
-Status: no agent fix yet
+Reason: judged by upstream reference test 'test_HTTPClient_Send_parse_complete_header_field_at_read_boundary'; fix proven
 
-Elapsed: pending
+Network: the proxy refused 0 request(s) from the agent run (none); allowed connections: api.anthropic.com x3. Counted from the proxy log; the isolation proof's own requests are excluded.
 
-Verifier: cplus a69c6524b9680dd349c511de32a628f40e7dc2a2 · 2026-11-20 16:20:44 UTC (configured; not run)
+Elapsed: 14.3 s
 
-Patch: sha256 pending
+Verifier: cplus a69c6524b9680dd349c511de32a628f40e7dc2a2 · 2026-11-20 18:43:50 UTC
 
-Agent: Claude Code · Version: not recorded
+Reference: ctest_module (module core_http_send_utest; only tests added by the fix fail on the base)
+
+Patch: sha256 79462f3a4cd2caddc9aebfd2dc07a88921bf6ec1128c9b1d6253341c7b905bc6
+
+Agent: Claude Code · Version: 2.1.323 (Claude Code)
 
 | Check | Status |
 | --- | --- |
-| anti_cheat | SKIPPED |
-| build:baseline | SKIPPED |
-| repro:baseline | SKIPPED |
-| build:patched | SKIPPED |
-| repro:patched | SKIPPED |
-| repeat | SKIPPED |
-| revert | SKIPPED |
-| regression | SKIPPED |
+| anti_cheat | PASS |
+| build:baseline | PASS |
+| repro:baseline | PASS |
+| build:patched | PASS |
+| repro:patched | PASS |
+| repeat | PASS |
+| revert | PASS |
+| regression | PASS |
