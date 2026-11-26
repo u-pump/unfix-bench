@@ -11,7 +11,7 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 <!-- results:start -->
 | Case | Project | Bug | Codex CLI | Claude Code |
 | --- | --- | --- | --- | --- |
-| corehttp-210 | [coreHTTP](https://github.com/FreeRTOS/coreHTTP) | [#210: header field at a read boundary](https://github.com/FreeRTOS/coreHTTP/pull/210) | [REJECTED](results/corehttp-210/codex-cli.md) | [VERIFIED](results/corehttp-210/claude-code.md) |
+| corehttp-210 | [coreHTTP](https://github.com/FreeRTOS/coreHTTP) | [#210: header field at a read boundary](https://github.com/FreeRTOS/coreHTTP/pull/210) | [VERIFIED](results/corehttp-210/codex-cli.md) | [VERIFIED](results/corehttp-210/claude-code.md) |
 | coremqtt-331 | [coreMQTT](https://github.com/FreeRTOS/coreMQTT) | [#331: zero-length client identifier](https://github.com/FreeRTOS/coreMQTT/pull/331) | [VERIFIED](results/coremqtt-331/codex-cli.md) | [VERIFIED](results/coremqtt-331/claude-code.md) |
 | cpp-peglib-121 | [cpp-peglib](https://github.com/yhirose/cpp-peglib) | [#121: start rule with ignore operator](https://github.com/yhirose/cpp-peglib/issues/121) | [REJECTED](results/cpp-peglib-121/codex-cli.md) | [REJECTED](results/cpp-peglib-121/claude-code.md) |
 | fmt-4490 | [fmt](https://github.com/fmtlib/fmt) | [#4490: allocator move](https://github.com/fmtlib/fmt/pull/4490) | [REJECTED](results/fmt-4490/codex-cli.md) | [REJECTED](results/fmt-4490/claude-code.md)[^1] |
@@ -29,7 +29,7 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 
 | Agent | VERIFIED | REJECTED | REVIEW | NOT_VERIFIABLE | NO_PATCH | ERROR | PENDING |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Codex CLI | 6 | 8 | 0 | 0 | 0 | 0 | 1 |
+| Codex CLI | 7 | 7 | 0 | 0 | 0 | 0 | 1 |
 | Claude Code | 7 | 7 | 0 | 0 | 0 | 0 | 1 |
 <!-- results:end -->
 
@@ -91,7 +91,7 @@ The focused command above runs the selected `bug_test`; the CTest command runs t
 
 ## Limits
 
-- Fifteen cases are a small sample; seven are from fmt. The four added last (corehttp-210, freertos-plus-tcp-1018, -1158 and -1357) have not been run by either agent (PENDING) and are judged by cplus like coremqtt-331. The eleventh, coremqtt-331, is the first Unity case and is judged by cplus; both agents ran once, and both patches were checked again after the verifier revision moved to `a69c652` (the agents were not rerun, see [DECISIONS](docs/DECISIONS.md)).
+- Fifteen cases are a small sample; seven are from fmt. The four added last (corehttp-210, freertos-plus-tcp-1018, -1158 and -1357) are judged by cplus like coremqtt-331; six of their eight results are in (corehttp-210 and -1357 for both agents, -1018 for Claude Code, -1158 for Codex CLI) and two are still PENDING (-1018 for Codex CLI, -1158 for Claude Code). The eleventh, coremqtt-331, is the first Unity case and is judged by cplus; both agents ran once, and both patches were checked again after the verifier revision moved to `a69c652` (the agents were not rerun, see [DECISIONS](docs/DECISIONS.md)).
 - Fix dates of the cases added from BENCH-20 on are recorded in the case (`meta.yaml`: `fix_date`, `post_cutoff`). coremqtt-331: fix 2025-10-30, **fix before 2026-06-30** (`post_cutoff: false`). corehttp-210: fix 2026-11-17, **fix after 2026-06-30** (`post_cutoff: true`). freertos-plus-tcp-1018: fix 2023-09-20, before (`false`). freertos-plus-tcp-1158: fix 2024-06-17, before (`false`). freertos-plus-tcp-1357: fix 2026-08-06, **after** (`true`). bench v1 takes fixes merged on or after 2023-01-01, so most of its cases are before that date; the goal of at least half cases after 2026-06-30 belongs to the way to 100 cases, not to v1. The first ten cases carry no such field.
 - In fmt-4960, the reference test was chosen after the agent run. The selection rule was applied retrospectively and documented in [the case file](cases/fmt-4960/case.yaml); the patch was never edited.
 - The verifier is not open source yet. Public reports contain the verdict, eight check statuses, and elapsed time.
