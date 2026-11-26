@@ -1,0 +1,16 @@
+diff --git a/source/FreeRTOS_IPv6_Sockets.c b/source/FreeRTOS_IPv6_Sockets.c
+index 5e5744d..0ec6d62 100644
+--- a/source/FreeRTOS_IPv6_Sockets.c
++++ b/source/FreeRTOS_IPv6_Sockets.c
+@@ -437,9 +437,9 @@ const char * FreeRTOS_inet_ntop6( const void * pvSource,
+         }
+     }
+ 
+-    if( xSet.xIndex < 8 )
++    if( ( xSet.xIndex < 8 ) || ( xSet.uxTargetIndex >= uxSize ) )
+     {
+-        /* Didn't reach the last nibble: clear the string. */
++        /* Didn't reach the last nibble, or no room for the terminating NUL. */
+         pcReturn = NULL;
+     }
+     else

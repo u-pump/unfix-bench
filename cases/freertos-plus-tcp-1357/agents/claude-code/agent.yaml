@@ -1,10 +1,52 @@
 {
   "name": "Claude Code",
-  "version": null,
-  "model": null,
-  "invocation": null,
-  "date_utc": null,
-  "environment": null,
-  "patch_sha256": null,
-  "attempt_note": null
+  "version": "2.1.323 (Claude Code)",
+  "model": "claude-opus-5-5",
+  "requested_model": "claude-opus-5-5",
+  "effort": "default (not set)",
+  "date_utc": "2026-11-20T17:34:51Z",
+  "environment": "GitHub Actions ubuntu-latest; agent in a Docker container (read-only root, non-root uid, writable only /work and a tmpfs home, all capabilities dropped); container network is internal and egress goes through a proxy that allows only api.anthropic.com:443; --safe-mode, no web tools, no MCP, no memory or CLAUDE.md",
+  "invocation": "claude -p --output-format stream-json --verbose --no-session-persistence --safe-mode --strict-mcp-config --disable-slash-commands --permission-mode acceptEdits --permission-prompts none --tools Bash,Read,Edit,Write,Glob,Grep --allowedTools Bash,Read,Edit,Write,Glob,Grep --disallowedTools WebSearch,WebFetch --model claude-opus-5-5 (task text on stdin)",
+  "session_id": "1d4f6280-4f96-4738-9c11-8294aed3db85",
+  "patch_sha256": "bb5bd5a361f16cf8227c5c049182bbe88ff84f97fc1709250e7b729c4abc5523",
+  "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "verdict_history": [
+    {
+      "verdict": "INFRASTRUCTURE_ERROR",
+      "reason": "cplus bug baseline: reference test did not reproduce",
+      "verifier": "cplus a69c6524b9680dd349c511de32a628f40e7dc2a2",
+      "checked_utc": "2026-11-20 17:35:17",
+      "note": "limitation of the verifier (FreeRTOS-Plus-TCP was configured twice, c-plus #113), not a verdict on the patch"
+    },
+    {
+      "verdict": "VERIFIED",
+      "verifier": "cplus dc84e98a80499b118ffb437ce722533fcde03af7",
+      "checked_utc": "2026-11-26 15:32:43",
+      "note": "same patch (sha256 bb5bd5a3...), agent not rerun; 8 of 8 gates PASS; verify run 45850071169"
+    }
+  ],
+  "metrics": {
+    "bash_commands": 9,
+    "tool_calls": 12,
+    "turns": 13,
+    "duration_seconds": 118,
+    "tokens": {
+      "input": 22,
+      "output": 2799,
+      "cache_creation_input": 16149,
+      "cache_read_input": 146103
+    }
+  },
+  "network_commands_seen_in_transcript": [],
+  "proxy": {
+    "refused_requests": 0,
+    "refused": {},
+    "allowed_connections": {
+      "api.anthropic.com": 3
+    },
+    "scope": "agent run only, counted from the proxy log; the isolation proof's requests are excluded"
+  },
+  "run_url": "https://github.com/u-pump/unfix-bench/actions/runs/44783989869",
+  "image": "sha256:1d6815729527b702f0296802e317a3b9f89a6da77d5a6e9053777208decaf00c",
+  "network_proof": "all isolation proofs passed before the run; log in the run artifact"
 }
