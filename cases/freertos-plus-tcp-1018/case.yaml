@@ -14,7 +14,7 @@
   "test": "ctest --test-dir build -R '^FreeRTOS_Sockets_TCP_API_utest$' --output-on-failure",
   "bug_test_granularity": "ctest_module",
   "build_network": "none",
-  "verifier_revision": "a69c6524b9680dd349c511de32a628f40e7dc2a2",
+  "verifier_revision": "dc84e98a80499b118ffb437ce722533fcde03af7",
   "module_other_tests": "3/3 pass",
   "submodules": [
     {
