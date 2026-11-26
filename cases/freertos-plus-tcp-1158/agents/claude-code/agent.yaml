@@ -1,10 +1,54 @@
 {
   "name": "Claude Code",
-  "version": null,
-  "model": null,
-  "invocation": null,
-  "date_utc": null,
-  "environment": null,
-  "patch_sha256": null,
-  "attempt_note": null
+  "version": "2.1.323 (Claude Code)",
+  "model": "claude-opus-5-5",
+  "requested_model": "claude-opus-5-5",
+  "effort": "default (not set)",
+  "date_utc": "2026-11-26T18:20:29Z",
+  "environment": "GitHub Actions ubuntu-latest; agent in a Docker container (read-only root, non-root uid, writable only /work and a tmpfs home, all capabilities dropped); container network is internal and egress goes through a proxy that allows only api.anthropic.com:443; --safe-mode, no web tools, no MCP, no memory or CLAUDE.md",
+  "invocation": "claude -p --output-format stream-json --verbose --no-session-persistence --safe-mode --strict-mcp-config --disable-slash-commands --permission-mode acceptEdits --permission-prompts none --tools Bash,Read,Edit,Write,Glob,Grep --allowedTools Bash,Read,Edit,Write,Glob,Grep --disallowedTools WebSearch,WebFetch --model claude-opus-5-5 (task text on stdin)",
+  "session_id": "43f12bb4-bb39-435b-bfe2-c3cdc37325bf",
+  "patch_sha256": "9a73359e53d4b8f3c5e5358544a31afe68aeb7bd41f8fbc40358b402af11b01f",
+  "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "verdict_history": [
+    {
+      "verdict": "REJECTED",
+      "reason": "anti_cheat FAIL: the patch changes a protected test (test/unit-test/FreeRTOS_DNS_Parser/FreeRTOS_DNS_Parser_utest.c, line 3072)",
+      "verifier": "cplus dc84e98a80499b118ffb437ce722533fcde03af7",
+      "checked_utc": "2026-11-26 18:21:04",
+      "note": "limitation of the verifier (an agent edit identical to the upstream hunk of the reference was counted as a violation, c-plus #114), not a verdict on the patch"
+    },
+    {
+      "verdict": "VERIFIED",
+      "verifier": "cplus 6121ef2a29edca936fdd9f16386782ca748e12fb",
+      "checked_utc": "2026-11-26 20:07:22",
+      "note": "same patch (sha256 9a73359e...), agent not rerun; 8 of 8 gates PASS; verify run 45888651481"
+    }
+  ],
+  "metrics": {
+    "bash_commands": 10,
+    "tool_calls": 17,
+    "turns": 18,
+    "duration_seconds": 120,
+    "tokens": {
+      "input": 30,
+      "output": 3960,
+      "cache_creation_input": 15055,
+      "cache_read_input": 192083
+    }
+  },
+  "network_commands_seen_in_transcript": [
+    "git"
+  ],
+  "proxy": {
+    "refused_requests": 0,
+    "refused": {},
+    "allowed_connections": {
+      "api.anthropic.com": 3
+    },
+    "scope": "agent run only, counted from the proxy log; the isolation proof's requests are excluded"
+  },
+  "run_url": "https://github.com/u-pump/unfix-bench/actions/runs/45874578333",
+  "image": "sha256:1c22768b2a83238a7de68deaa24efab2810f8f9ccacd5ba868da402681935d4d",
+  "network_proof": "all isolation proofs passed before the run; log in the run artifact"
 }

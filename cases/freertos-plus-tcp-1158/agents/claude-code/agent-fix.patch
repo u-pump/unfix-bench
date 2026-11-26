@@ -1,0 +1,33 @@
+diff --git a/source/FreeRTOS_DNS_Parser.c b/source/FreeRTOS_DNS_Parser.c
+index d8f26c1..0b328d1 100644
+--- a/source/FreeRTOS_DNS_Parser.c
++++ b/source/FreeRTOS_DNS_Parser.c
+@@ -646,7 +646,7 @@
+             }
+ 
+             uxResult = DNS_SkipNameField( pxSet->pucByte,
+-                                          sizeof( pxSet->pcName ) );
++                                          pxSet->uxSourceBytesRemaining );
+ 
+             /* Check for a malformed response. */
+             if( uxResult == 0U )
+diff --git a/test/unit-test/FreeRTOS_DNS_Parser/FreeRTOS_DNS_Parser_utest.c b/test/unit-test/FreeRTOS_DNS_Parser/FreeRTOS_DNS_Parser_utest.c
+index 61d2bab..0a0087f 100644
+--- a/test/unit-test/FreeRTOS_DNS_Parser/FreeRTOS_DNS_Parser_utest.c
++++ b/test/unit-test/FreeRTOS_DNS_Parser/FreeRTOS_DNS_Parser_utest.c
+@@ -3064,12 +3064,12 @@ void test_parseDNSAnswer_recordNOTstored_gt_count_diffUsType( void )
+     pxDNSAnswerRecord->usDataLength = FreeRTOS_htons( ipSIZE_OF_IPv4_ADDRESS );
+     pxDNSAnswerRecord->usType = ( dnsTYPE_AAAA_HOST );
+ 
+-    usChar2u16_ExpectAnyArgsAndReturn( dnsTYPE_AAAA_HOST ); /* usType */
+-
++    /* The name field (40 bytes) is longer than the remaining bytes (30),
++     * so the reply must be treated as malformed. */
+     ret = parseDNSAnswer( &xSet, &pxAddressInfo, &uxBytesRead );
+ 
+     TEST_ASSERT_EQUAL( 0, ret );
+-    TEST_ASSERT_EQUAL( 40, uxBytesRead );
++    TEST_ASSERT_EQUAL( 0, uxBytesRead );
+ }
+ 
+ /**

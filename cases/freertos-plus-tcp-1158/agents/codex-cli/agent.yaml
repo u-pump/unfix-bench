@@ -25,6 +25,12 @@
       "verifier": "cplus dc84e98a80499b118ffb437ce722533fcde03af7",
       "checked_utc": "2026-11-26 16:03:13",
       "note": "same patch (sha256 b747ce7a...), agent not rerun; verify run 45855038692; the patch removes usChar2u16_ExpectAnyArgsAndReturn and changes an expected value from 40 to 0 in an existing test"
+    },
+    {
+      "verdict": "VERIFIED",
+      "verifier": "cplus 6121ef2a29edca936fdd9f16386782ca748e12fb",
+      "checked_utc": "2026-11-26 20:39:42",
+      "note": "same patch (sha256 b747ce7a...), agent not rerun; 8 of 8 gates PASS; verify run 45892595164; the REJECTED of dc84e98 was a limit of that verifier (an agent edit identical to the upstream hunk of the reference counted as a violation, c-plus #114), not a verdict on the patch"
     }
   ],
   "metrics": {

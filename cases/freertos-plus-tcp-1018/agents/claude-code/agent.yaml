@@ -23,6 +23,12 @@
       "verifier": "cplus dc84e98a80499b118ffb437ce722533fcde03af7",
       "checked_utc": "2026-11-26 16:12:13",
       "note": "same patch (sha256 79651013...), agent not rerun; verdict unchanged on the new revision; verify run 45856457875; the patch rewrites the expectations of an existing test (adds mock expectations, changes an assertion from -pdFREERTOS_ERRNO_EINVAL to uxDataLength - 20)"
+    },
+    {
+      "verdict": "VERIFIED",
+      "verifier": "cplus 6121ef2a29edca936fdd9f16386782ca748e12fb",
+      "checked_utc": "2026-11-26 20:45:48",
+      "note": "same patch (sha256 79651013...), agent not rerun; 8 of 8 gates PASS; verify run 45893309662; the REJECTED of a69c652 and dc84e98 was a limit of those verifiers (an agent edit identical to the upstream hunk of the reference counted as a violation, c-plus #114), not a verdict on the patch"
     }
   ],
   "metrics": {
