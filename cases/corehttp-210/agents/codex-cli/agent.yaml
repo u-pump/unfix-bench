@@ -11,6 +11,21 @@
   "session_id": "01a1fa44-6f3a-7bb3-a70f-429f60125808",
   "patch_sha256": "4aaf257b10967a42757c1ac12cc9c7d61eab549276d9ef2f310bb125a2976997",
   "attempt_note": "First completed attempt; build*/ output excluded from the patch.",
+  "verdict_history": [
+    {
+      "verdict": "REJECTED",
+      "reason": "anti_cheat FAIL: the patch changes a protected test (test/unit-test/core_http_send_utest.c, line 111)",
+      "verifier": "cplus a69c6524b9680dd349c511de32a628f40e7dc2a2",
+      "checked_utc": "2026-11-20 18:44:02",
+      "note": "limitation of the verifier (a new #define constant in a protected test counted as a violation, c-plus #110), not a verdict on the patch"
+    },
+    {
+      "verdict": "VERIFIED",
+      "verifier": "cplus dc84e98a80499b118ffb437ce722533fcde03af7",
+      "checked_utc": "2026-11-26 16:27:28",
+      "note": "same patch (sha256 4aaf257b...), agent not rerun; 8 of 8 gates PASS; verify run 45858881435"
+    }
+  ],
   "metrics": {
     "bash_commands": 20,
     "tool_calls": 27,
