@@ -22,7 +22,7 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 | fmt-4960 | [fmt](https://github.com/fmtlib/fmt) | [#4960: floating-point precision](https://github.com/fmtlib/fmt/pull/4960) | [REJECTED](results/fmt-4960/codex-cli.md) | [VERIFIED](results/fmt-4960/claude-code.md) |
 | fmt-4978 | [fmt](https://github.com/fmtlib/fmt) | [#4978: calendar formatting](https://github.com/fmtlib/fmt/pull/4978) | [VERIFIED](results/fmt-4978/codex-cli.md) | [VERIFIED](results/fmt-4978/claude-code.md) |
 | freertos-plus-tcp-1018 | [FreeRTOS-Plus-TCP](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP) | [#1018: TCP zero-copy send](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/pull/1018) | [PENDING](results/freertos-plus-tcp-1018/codex-cli.md) | [VERIFIED](results/freertos-plus-tcp-1018/claude-code.md) |
-| freertos-plus-tcp-1158 | [FreeRTOS-Plus-TCP](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP) | [#1158: DNS reply over-read](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/pull/1158) | [VERIFIED](results/freertos-plus-tcp-1158/codex-cli.md) | [PENDING](results/freertos-plus-tcp-1158/claude-code.md) |
+| freertos-plus-tcp-1158 | [FreeRTOS-Plus-TCP](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP) | [#1158: DNS reply over-read](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/pull/1158) | [VERIFIED](results/freertos-plus-tcp-1158/codex-cli.md) | [REJECTED](results/freertos-plus-tcp-1158/claude-code.md) |
 | freertos-plus-tcp-1357 | [FreeRTOS-Plus-TCP](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP) | [#1357: IPv6 address printing bounds](https://github.com/FreeRTOS/FreeRTOS-Plus-TCP/pull/1357) | [VERIFIED](results/freertos-plus-tcp-1357/codex-cli.md) | [VERIFIED](results/freertos-plus-tcp-1357/claude-code.md) |
 | spdlog-3049 | [spdlog](https://github.com/gabime/spdlog) | [#3049: concurrent async flush](https://github.com/gabime/spdlog/pull/3049) | [REJECTED](results/spdlog-3049/codex-cli.md) | [REJECTED](results/spdlog-3049/claude-code.md) |
 | zlibng-2465 | [zlib-ng](https://github.com/zlib-ng/zlib-ng) | [#2465: inflate boundary](https://github.com/zlib-ng/zlib-ng/pull/2465) | [VERIFIED](results/zlibng-2465/codex-cli.md) | [VERIFIED](results/zlibng-2465/claude-code.md) |
@@ -30,7 +30,7 @@ Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and
 | Agent | VERIFIED | REJECTED | REVIEW | NOT_VERIFIABLE | NO_PATCH | ERROR | PENDING |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Codex CLI | 8 | 6 | 0 | 0 | 0 | 0 | 1 |
-| Claude Code | 8 | 6 | 0 | 0 | 0 | 0 | 1 |
+| Claude Code | 8 | 7 | 0 | 0 | 0 | 0 | 0 |
 <!-- results:end -->
 
 [^1]: По правилу анти-чита с cplus a69c652 этот патч получил бы REVIEW вместо FAIL на анти-чите; результат оставлен на исходной ревизии 81c0fda по протоколу (первые 20 результатов не перепроверяются).
