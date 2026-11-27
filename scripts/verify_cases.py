@@ -49,6 +49,14 @@ class CaseExecutionError(RuntimeError):
         super().__init__(self.public_reason)
 
 
+class LicenceError(CaseExecutionError):
+    """cplus exit code 5: no usable licence. The public reason is the licence line cplus printed, nothing else."""
+
+    def __init__(self, line: str) -> None:
+        super().__init__("licence", line)
+        self.public_reason = line
+
+
 def quiet(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(args, cwd=cwd, text=True, capture_output=True, check=False)
 
@@ -86,6 +94,48 @@ def cplus_diagnostic(stderr: object) -> str | None:
     return None
 
 
+# cplus exits with 5 when the licence is missing, expired or invalid (cplus 0.2.5); stderr then starts with one of
+# "No licence. ...", "Licence expired on ...", "Licence key is not valid ...". It is an infrastructure problem
+# of the benchmark, never a verdict about the patch.
+EXIT_LICENCE = 5
+LICENCE_LINE = re.compile(r"(?:No licence\.|Licence expired on |Licence key is not valid)")
+LICENCE_WARNING = re.compile(r"WARN: Licence expired\b")
+LICENCE_FALLBACK = "licence: cplus reported a licence problem"
+
+
+def licence_secrets() -> list[str]:
+    """The licence key from the environment (UNFIX_LICENCE or the file UNFIX_LICENCE_FILE), only to redact it."""
+    found = [os.environ.get("UNFIX_LICENCE", "")]
+    path = os.environ.get("UNFIX_LICENCE_FILE", "").strip()
+    if path:
+        try:
+            found.append(Path(path).read_text(encoding="utf-8"))
+        except OSError:
+            pass
+    return [value.strip() for value in found if len(value.strip()) >= 8]
+
+
+def licence_line(stderr: object, prefix: re.Pattern[str] = LICENCE_LINE) -> str | None:
+    """The first licence line of stderr, one line, without paths or the key, at most 240 characters; else None."""
+    if not isinstance(stderr, str):
+        return None
+    for raw in stderr.splitlines():
+        line = " ".join(ANSI.sub("", raw).split())
+        if not prefix.match(line):
+            continue
+        for secret in licence_secrets():
+            line = line.replace(secret, "[key]")
+        line = re.sub(r"(?<!\w)(?:[A-Za-z]:[\\/]|\.{0,2}/(?!/))\S+", "[path]", line)
+        return line[:240]
+    return None
+
+
+def check_licence(run: subprocess.CompletedProcess[str]) -> None:
+    """Raise LicenceError for exit code 5 of cplus, with the licence line from stderr as the reason."""
+    if run.returncode == EXIT_LICENCE:
+        raise LicenceError(licence_line(run.stderr) or LICENCE_FALLBACK)
+
+
 def log_cplus(case_id: str, agent_id: str, stage: str, run: subprocess.CompletedProcess[str]) -> None:
     """Keep the complete output of one cplus call in $RUNNER_TEMP (private, never uploaded); print the public facts.
 
@@ -105,6 +155,9 @@ def log_cplus(case_id: str, agent_id: str, stage: str, run: subprocess.Completed
         line = cplus_diagnostic(run.stderr)
         print(f"{case_id}/{agent_id}: {stage} returncode={run.returncode}" + (f"; {line}" if line else ""),
               flush=True)
+    warning = licence_line(run.stderr, LICENCE_WARNING)
+    if warning:
+        print(f"{case_id}/{agent_id}: {stage}: {warning}", flush=True)
     if os.environ.get("VERIFY_DEBUG_LOG") == "true":
         tail = text.splitlines()[-200:]
         print(f"::group::{case_id}/{agent_id} {stage} (last {len(tail)} lines)")
@@ -578,6 +631,7 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
     verdict_words = sorted(set(re.findall(r"(REPRODUCED|NOT_VERIFIABLE|ERROR)", bug.stdout or "")))
     print(f"{case_id}/{agent_id}: cplus bug exit={bug.returncode} words={verdict_words} "
           f"{baseline_summary(spec) if spec.is_file() else 'no bug spec written'}", flush=True)
+    check_licence(bug)
     if bug.returncode or "REPRODUCED" not in bug.stdout or not spec.is_file():
         raise CaseExecutionError("cplus bug baseline", (bug.returncode and cplus_diagnostic(bug.stderr))
                                  or "reference test did not reproduce")
@@ -599,6 +653,7 @@ def run_case(case_id: str, agent_id: str) -> tuple[str, dict[str, str], float | 
     verify = quiet_stage("verify", "verifier could not evaluate patch", *verify_args)
     elapsed = time.monotonic() - started
     log_cplus(case_id, agent_id, "cplus verify", verify)
+    check_licence(verify)
     try:
         report = extract_json(verify.stdout)
     except ValueError as exc:
