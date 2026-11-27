@@ -6,9 +6,9 @@ Reason: judged by upstream reference test 'Start rule with ignore operator test'
 
 Network: the proxy refused 0 request(s) from the agent run (none); allowed hosts: api.anthropic.com. Reconstructed from the stored proxy log, proof requests subtracted by their known number.
 
-Elapsed: 8.8 s
+Elapsed: 9.2 s
 
-Verifier: cplus 81c0fda242fef1daf55d3164e06127d372c81caa · 2026-11-13 21:16:22 UTC
+Verifier: cplus 81c0fda242fef1daf55d3164e06127d372c81caa · 2026-11-27 15:32:49 UTC
 
 Patch: sha256 3157c36fbb9778eaf2d8aeaf8f1ad229acaa0ec0403f0adddcb291467b07f729
 
