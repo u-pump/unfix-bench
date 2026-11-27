@@ -51,7 +51,7 @@ COMMON_STRINGS = ("id", "repo", "base", "upstream_fix", "bug_test", "reference_s
 COMMON_OPTIONAL = ("reference_test_name", "reference_selection_note", "verifier_revision")
 # The cplus revision new cases are verified with (cases without the field use the one their results were made
 # with, see scripts/verify_cases.py LEGACY_REVISION). Drafts carry it; the owner can change it per case.
-VERIFIER_FOR_NEW_CASES = "6121ef2a29edca936fdd9f16386782ca748e12fb"
+VERIFIER_FOR_NEW_CASES = "6f9a86eeae62562adbf97c736945eafd6c6187be"
 OWNER_ONLY = ("agent_input_repo", "input_sha256")
 CANDIDATE_EXTRA = ("bug_test_granularity", "build_network", "module_other_tests", "submodules")
 META_FIELDS = ("source", "spdx", "fix_date", "post_cutoff", "upstream_pr", "fuzz_origin",
