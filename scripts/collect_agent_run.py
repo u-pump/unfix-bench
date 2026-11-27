@@ -479,9 +479,19 @@ def cmd_error(args: argparse.Namespace) -> int:
     return 0
 
 
+def licence_key() -> str | None:
+    """The cplus licence key, read from UNFIX_LICENCE_FILE when a step gives that path (only to look for it)."""
+    path = os.environ.get("UNFIX_LICENCE_FILE", "").strip()
+    try:
+        return Path(path).read_text(encoding="utf-8").strip() if path else None
+    except OSError:
+        return None
+
+
 def cmd_scan(args: argparse.Namespace) -> int:
     files = [Path(p) for p in args.files]
     hits = scan_for_secret(files, os.environ.get(TOKEN_ENV))
+    hits += scan_for_secret(files, licence_key())
     if hits:
         for path in files:
             if path.is_file():

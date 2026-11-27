@@ -99,9 +99,19 @@ jobs:
       - name: Detect submitted patches
         id: patches
         run: echo "has_patch=$(python scripts/verify_cases.py --has-patches)" >> "$GITHUB_OUTPUT"
+      - name: Prepare the licence key file
+        id: licence
+        # cplus 0.2.5 needs a key. It goes into a file outside the workspace (UNFIX_LICENCE_FILE for the cplus
+        # steps below), not into the environment of every step. The secret is read into a variable named in
+        # env, because `secrets` cannot be used in `if`; a pull request from a fork has none and skips cplus.
+        if: steps.patches.outputs.has_patch == 'true'
+        env:
+          UNFIX_LICENCE: ${{ secrets.UNFIX_LICENCE }}
+          IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        run: bash scripts/prepare_licence.sh
       - name: Install private verifier
         id: install
-        if: steps.patches.outputs.has_patch == 'true'
+        if: steps.patches.outputs.has_patch == 'true' && steps.licence.outputs.available == 'true'
         env:
           CPLUS_READ_TOKEN: ${{ secrets.CPLUS_READ_TOKEN }}
         run: |
@@ -109,7 +119,9 @@ jobs:
           bash scripts/install_private.sh "${revisions[@]}"
       - name: Verify cases
         id: verify_cases
+        if: steps.licence.outputs.available != 'false'
         env:
+          UNFIX_LICENCE_FILE: ${{ steps.licence.outputs.file }}
           CPLUS_DATA_DIR: ${{ runner.temp }}/cplus-data
           RESULTS_DIR: ${{ runner.temp }}/public-results
         run: python scripts/verify_cases.py
@@ -119,6 +131,7 @@ jobs:
         # logs only; the secret scan still runs before anything is uploaded.
         if: ${{ always() && env.VERIFY_DEBUG_LOG == 'true' && steps.install.outcome == 'success' }}
         env:
+          UNFIX_LICENCE_FILE: ${{ steps.licence.outputs.file }}  # only for the secret scan: files with the key are dropped
           CPLUS_DATA_DIR: ${{ runner.temp }}/cplus-data
           CASE_CHECKOUTS: ${{ runner.temp }}/case-checkouts
           STAGE: ${{ runner.temp }}/cplus-debug

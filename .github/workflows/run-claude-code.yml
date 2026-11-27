@@ -193,6 +193,14 @@ jobs:
           sudo sysctl vm.mmap_rnd_bits
           sudo sysctl -w vm.mmap_rnd_bits=28
           sudo sysctl vm.mmap_rnd_bits
+      - name: Prepare the licence key file
+        id: licence
+        # cplus 0.2.5 needs a key; this job (not the agent job) is the only one that calls cplus. Key in a file
+        # outside the workspace, see scripts/prepare_licence.sh.
+        if: steps.place.outputs.has_patch == 'true'
+        env:
+          UNFIX_LICENCE: ${{ secrets.UNFIX_LICENCE }}
+        run: bash scripts/prepare_licence.sh
       - name: Install private verifier
         if: steps.place.outputs.has_patch == 'true'
         env:
@@ -205,6 +213,7 @@ jobs:
       - name: Verify with the same verifier as every other agent
         if: steps.place.outputs.recorded == 'true'
         env:
+          UNFIX_LICENCE_FILE: ${{ steps.licence.outputs.file }}
           CPLUS_DATA_DIR: ${{ runner.temp }}/cplus-data
           RESULTS_DIR: ${{ runner.temp }}/final/results
           SELECT_CASE: ${{ matrix.case }}
