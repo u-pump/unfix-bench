@@ -125,7 +125,8 @@ def licence_line(stderr: object, prefix: re.Pattern[str] = LICENCE_LINE) -> str 
             continue
         for secret in licence_secrets():
             line = line.replace(secret, "[key]")
-        line = re.sub(r"(?<!\w)(?:[A-Za-z]:[\\/]|\.{0,2}/(?!/))\S+", "[path]", line)
+        # a URL (scheme://...) is not a path: the slash after the scheme's "//" must not start a match
+        line = re.sub(r"(?<![\w/])(?:[A-Za-z]:[\\/]|\.{0,2}/(?!/))\S+", "[path]", line)
         return line[:240]
     return None
 

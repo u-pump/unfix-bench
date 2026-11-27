@@ -17,10 +17,11 @@ import collect_agent_run
 import verify_cases
 
 LINES = (
-    "No licence. Set UNFIX_LICENCE or UNFIX_LICENCE_FILE.",
-    "Licence expired on 2026-12-01. Ask the vendor for a new key.",
-    "Licence key is not valid: signature mismatch",
+    "No licence. Run: unfix activate <key>. Keys come with the Team subscription at https://unfix.dev/#pricing",
+    "Licence expired on 2026-12-01. Renew at https://unfix.dev/#pricing or write hello@unfix.dev",
+    "Licence key is not valid — check it was copied whole",
 )
+WARNING = "WARN: Licence expired on 2026-11-20; 13 days of grace left — renew at https://unfix.dev/#pricing"
 
 
 def done(stdout: str = "", returncode: int = 0, stderr: str = "") -> CompletedProcess[str]:
@@ -68,6 +69,15 @@ class LicenceExitCodeTest(unittest.TestCase):
                 self.assertEqual(error.public_reason, line)
                 self.assertEqual(calls, ["bug"])
                 self.assertNotIn("PRIVATE", out)
+
+    def test_urls_stay_whole_and_paths_are_still_replaced(self) -> None:
+        for line in LINES[:2]:
+            self.assertEqual(verify_cases.licence_line("x\n" + line + "\n"), line)
+            _, error, _, _ = self.run_case(done("", 5, line + "\n"), done())
+            self.assertIn("https://unfix.dev/#pricing", error.public_reason)
+            self.assertNotIn("[path]", error.public_reason)
+        mixed = verify_cases.licence_line("No licence. See /etc/unfix/key and https://unfix.dev/#pricing")
+        self.assertEqual(mixed, "No licence. See [path] and https://unfix.dev/#pricing")
 
     def test_exit_5_of_verify_is_the_licence_line_even_with_json_on_stdout(self) -> None:
         stdout = json.dumps({"schema_version": 1, "verdict": "NOT_VERIFIABLE", "summary": "x",
@@ -117,11 +127,11 @@ class LicenceExitCodeTest(unittest.TestCase):
         stdout = json.dumps({"schema_version": 1, "verdict": "VERIFIED", "summary": "ok",
                              "infrastructure_error": None, "gates": []})
         result, error, _, out = self.run_case(
-            done("REPRODUCED", 0, "WARN: Licence expired on 2026-11-20; grace period ends 2026-12-20\n"),
+            done("REPRODUCED", 0, WARNING + "\n"),
             done(stdout, 0, ""))
         self.assertIsNone(error)
         self.assertEqual(result[0], "VERIFIED")
-        self.assertIn("WARN: Licence expired on 2026-11-20", out)
+        self.assertIn(WARNING, out)
 
 
 class LicenceScanTest(unittest.TestCase):
