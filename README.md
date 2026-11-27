@@ -2,7 +2,7 @@
 
 Verified by [Unfix](https://unfix.dev) — an independent verifier for C/C++ and firmware fixes. It doesn't write code; it reproduces the bug, applies the fix, removes it again and checks that the bug comes back.
 
-**What this is.** Ten real bugs from open-source C/C++ projects. Two AI coding agents, Codex CLI and Claude Code, each got every bug once, with the same inputs, and made one fix attempt. Each patch was then judged by the same verifier against the maintainers' own upstream test. The tables below are the outcome: one verdict per agent and case, no ranking.
+**What this is.** Fifteen real bugs from open-source C/C++ and embedded projects (fmt, spdlog, zlib-ng, cpp-peglib, coreMQTT, coreHTTP, FreeRTOS-Plus-TCP). Two AI coding agents, Codex CLI and Claude Code, each got every bug once, with the same inputs, and made one fix attempt. Each patch was then judged by the same verifier against the maintainers' own upstream test. The tables below are the outcome: one verdict per agent and case, no ranking.
 
 **How to check a verdict.** Open the case's report in [`results/`](results), take the patch from `cases/<case>/agents/<agent>/agent-fix.patch`, and follow [Check a verdict yourself](#check-a-verdict-yourself). The agents' environments differ; the differences are stated under [What the agent got](#what-the-agent-got).
 
@@ -96,6 +96,7 @@ The focused command above runs the selected `bug_test`; the CTest command runs t
 - In fmt-4960, the reference test was chosen after the agent run. The selection rule was applied retrospectively and documented in [the case file](cases/fmt-4960/case.yaml); the patch was never edited.
 - The verifier is not open source yet. Public reports contain the verdict, eight check statuses, and elapsed time.
 - Each result names the verifier revision it was made with (the `Verifier:` line). All 20 results of the first ten cases were made with `81c0fda` and are not re-checked; cases added later are pinned to a newer revision, shown in their own results.
+- **Verifier defects found by the benchmark.** Running batch 1 exposed three defects of the verifier (cplus), each fixed upstream in c-plus and recorded in [DECISIONS](docs/DECISIONS.md#bench-20-verifier-revision-for-batch-1-moves-to-dc84e98-the-four-batch-1-cases-are-verified-again-no-agent-is-rerun). (1) c-plus #110: the anti-cheat falsely rejected a new `#define` in a test file (corehttp-210, Codex CLI). (2) c-plus #113: CMake was configured twice, so the FreeRTOS-Plus-TCP build failed with `INFRASTRUCTURE_ERROR` (freertos-plus-tcp-1357 and -1158). (3) c-plus #114 ([DECISIONS](docs/DECISIONS.md#bench-20-verifier-revision-moves-to-6121ef2-four-results-of-1158-and-1018-are-verified-again-no-agent-is-rerun)): a test edit identical to the upstream fix was counted as weakening the test (freertos-plus-tcp-1158, both agents; freertos-plus-tcp-1018, Claude Code). No agent was rerun; only the judge changed. A result that was verified again keeps the earlier verdict and revision in `verdict_history` in its `agent.yaml`.
 - One attempt per agent and case measures that attempt, not a success rate; the conditions of the two agents differ in the ways listed in the [protocol](docs/protocol.md#conditions-codex-cli-and-claude-code).
 
 ## Found a wrong verdict?
