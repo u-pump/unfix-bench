@@ -141,7 +141,7 @@ class RecordTest(unittest.TestCase):
                              ("test_new", "ctest_module", "none"))
             self.assertEqual(case["test"], "ctest --test-dir build -R '^core_mqtt_utest$' --output-on-failure")
             self.assertEqual((meta["post_cutoff"], meta["fuzz_origin"], meta["mined_run_url"]), (True, None, RUN))
-            self.assertEqual(case["verifier_revision"], "6121ef2a29edca936fdd9f16386782ca748e12fb")
+            self.assertEqual(case["verifier_revision"], "6f9a86eeae62562adbf97c736945eafd6c6187be")
             self.assertNotIn("agent_input_repo", case)
             issue = (env.root / "candidates" / "coremqtt-383" / "ISSUE.md").read_text(encoding="utf-8")
             self.assertIn("nothing was removed automatically", issue)
